@@ -83,6 +83,7 @@ public class PallasUtils {
     }
 
     public static void runScanner() {
+        LOGGER.info("Starting scanner...");
         Main.jda.getPresence().setPresence(OnlineStatus.ONLINE, Activity.playing("scanning..."));
         GlobalObject globalObject = MongoUtils.fetchGlobalObject();
         try {
