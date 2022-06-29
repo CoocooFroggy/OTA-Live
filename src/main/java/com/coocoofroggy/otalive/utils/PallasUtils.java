@@ -37,43 +37,7 @@ import java.util.stream.Collectors;
 
 public class PallasUtils {
     private static final Gson gson = new Gson();
-    private static final Pattern PZB_FILE_PATTERN = Pattern.compile(" f (.*)");
     private static final Logger LOGGER = LoggerFactory.getLogger(PallasUtils.class);
-
-    public static String pallas(String device, String boardId, String assetAudience) throws IOException {
-        Map<String, Object> requestMap = Map.of(
-                "ClientVersion", 2,
-                "AssetType", "com.apple.MobileAsset.SoftwareUpdate",
-                "AssetAudience", assetAudience,
-                "ProductType", device,
-                "HWModelStr", boardId,
-                // These two are to not get deltas
-                "ProductVersion", "0",
-                "BuildVersion", "0",
-                "CompatibilityVersion", 20
-        );
-        String s = gson.toJson(requestMap);
-
-        CloseableHttpClient client = HttpClients.createDefault();
-        HttpPost httpPost = new HttpPost("https://gdmf.apple.com/v2/assets");
-        httpPost.setEntity(new StringEntity(s));
-        httpPost.addHeader("Content-Type", "application/json");
-
-        CloseableHttpResponse response = client.execute(httpPost);
-        String responseString = IOUtils.toString(response.getEntity().getContent(), StandardCharsets.UTF_8);
-
-        response.close();
-        client.close();
-
-        return responseString;
-    }
-
-    public static PallasResponse getContent(String encodedString) {
-        // The part between the two dots is what we need
-        String meat = encodedString.split("\\.")[1];
-        String decoded = new String(Base64.decodeBase64(meat), StandardCharsets.UTF_8);
-        return gson.fromJson(decoded, PallasResponse.class);
-    }
 
     public static void runScanner() {
         LOGGER.info("Starting scanner...");
@@ -90,7 +54,7 @@ public class PallasUtils {
 
                 for (String assetAudience : globalObject.getAssetAudiences()) {
                     String responseString = pallas(device, boardId, assetAudience);
-                    PallasResponse pallasResponse = getContent(responseString);
+                    PallasResponse pallasResponse = parseJwt(responseString);
                     for (Asset asset : pallasResponse.getAssets()) {
                         LOGGER.info(asset.getBuildId() + " " + asset.getSupportedDevicesPretty());
                         List<String> processedBuildIdDeviceCombos = globalObject.getProcessedBuildIdDeviceCombo();
@@ -111,7 +75,7 @@ public class PallasUtils {
                             Message message = channel.sendMessageEmbeds(embedBuilder.build()).complete();
 
                             // Scan for dev files
-                            List<String> devFiles = listDevFiles(asset.getFullUrl());
+                            List<String> devFiles = listDevFiles(asset.getFullUrl(), boardId);
                             String collect = "None found";
                             if (!devFiles.isEmpty())
                                 collect = devFiles.stream().collect(Collectors.joining("`\n`", "`", "`"));
@@ -146,45 +110,88 @@ public class PallasUtils {
         }
     }
 
-    /*private static List<String> listDevFiles(String urlString) throws IOException {
-        URL url;
-        try {
-            url = new URL(urlString);
-        } catch (MalformedURLException e) {
-            return Collections.singletonList("Failed to parse URL.");
-        }
-        ZipFile zip = new ZipFile(new HttpChannel(url), urlString, StandardCharsets.UTF_8.name(), true, true);
+    public static String pallas(String device, String boardId, String assetAudience) throws IOException {
+        Map<String, Object> requestMap = Map.of(
+                "ClientVersion", 2,
+                "AssetType", "com.apple.MobileAsset.SoftwareUpdate",
+                "AssetAudience", assetAudience,
+                "ProductType", device,
+                "HWModelStr", boardId,
+                // These two are to not get deltas
+                "ProductVersion", "0",
+                "BuildVersion", "0",
+                "CompatibilityVersion", 20
+        );
+        String s = gson.toJson(requestMap);
 
-        List<String> toReturn = new ArrayList<>();
-        Enumeration<ZipArchiveEntry> entries = zip.getEntries();
-        while (entries.hasMoreElements()) {
-            ZipArchiveEntry entry = entries.nextElement();
-            System.out.println(entry.getName());
-            if (entry.getName().toLowerCase().contains("development")) {
-                toReturn.add(entry.getName());
-            }
-        }
-        return toReturn;
-    }*/
+        CloseableHttpClient client = HttpClients.createDefault();
+        HttpPost httpPost = new HttpPost("https://gdmf.apple.com/v2/assets");
+        httpPost.setEntity(new StringEntity(s));
+        httpPost.addHeader("Content-Type", "application/json");
 
-    private static List<String> listDevFiles(String urlString) throws IOException, InterruptedException {
+        CloseableHttpResponse response = client.execute(httpPost);
+        String responseString = IOUtils.toString(response.getEntity().getContent(), StandardCharsets.UTF_8);
+
+        response.close();
+        client.close();
+
+        return responseString;
+    }
+
+    public static PallasResponse parseJwt(String encodedString) {
+        // The part between the two dots is what we need
+        String meat = encodedString.split("\\.")[1];
+        String decoded = new String(Base64.decodeBase64(meat), StandardCharsets.UTF_8);
+        return gson.fromJson(decoded, PallasResponse.class);
+    }
+
+    // region Partial Zip
+
+    private static final Pattern PZB_FILE_PATTERN = Pattern.compile(" f (.*)");
+    private static final String[] DEV_REGEXES = new String[]{
+            "development", "kasan", "debug", "diag", "factory", "device_map", "dev\\.im4p"
+    };
+    private static final String[] SPECIAL_CASE = new String[]{
+            "DeviceTree", "iBoot", "LLB", "sep-firmware", "iBEC", "iBSS"
+    };
+
+    private static List<String> listDevFiles(String urlString, String boardId) throws IOException, InterruptedException {
         ProcessBuilder processBuilder = new ProcessBuilder("pzb", "-l", urlString);
         Process process = processBuilder.start();
         BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()));
         StringBuilder output = new StringBuilder();
         String line;
         while ((line = reader.readLine()) != null)
-             output.append(line).append("\n");
+            output.append(line).append("\n");
         process.waitFor();
 
-        List<String> toReturn = new ArrayList<>();
+        List<String> devFiles = new ArrayList<>();
         Matcher matcher = PZB_FILE_PATTERN.matcher(output.toString());
+        lineLabel:
         while (matcher.find()) {
             String fileName = matcher.group(1);
-            if (fileName.toLowerCase().contains("development")) {
-                toReturn.add(fileName);
+            for (String regex : DEV_REGEXES) {
+                // If it's a dev file
+                if (fileName.toLowerCase().matches(regex)) {
+                    // Check for special case
+                    for (String s : SPECIAL_CASE) {
+                        if (fileName.contains(s)) {
+                            // Only add it to the list of dev files if it matches our board ID
+                            if (fileName.contains(boardId.substring(0, 4)))
+                                devFiles.add(fileName);
+                            // It will only match one special case—no need to check others
+                            continue lineLabel;
+                        }
+                    }
+                    // It's not a special case if we reach here
+                    devFiles.add(fileName);
+                    // Go to next line—we already found match
+                    continue lineLabel;
+                }
             }
         }
-        return toReturn;
+        return devFiles;
     }
+
+    // endregion
 }
