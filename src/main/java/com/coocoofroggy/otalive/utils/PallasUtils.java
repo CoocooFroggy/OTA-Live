@@ -22,8 +22,10 @@ import org.apache.http.impl.client.HttpClients;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.BufferedReader;
 import java.io.File;
 import java.io.IOException;
+import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
@@ -92,7 +94,7 @@ public class PallasUtils {
                 String boardId = split[1];
                 String deviceHumanName = split[2];
 
-                for (String assetAudience : ASSET_AUDIENCES) {
+                for (String assetAudience : globalObject.getAssetAudiences()) {
                     String responseString = pallas(device, boardId, assetAudience);
                     PallasResponse pallasResponse = getContent(responseString);
                     for (Asset asset : pallasResponse.getAssets()) {
@@ -172,16 +174,14 @@ public class PallasUtils {
         ProcessBuilder processBuilder = new ProcessBuilder("pzb", "-l", urlString);
         Process process = processBuilder.start();
         BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()));
-        String output = "";
+        StringBuilder output = new StringBuilder();
         String line;
-        while ((line = reader.readLine()) != null) {
-             System.out.println("tasklist: " + line);
-             output += line + "\n";
-        }
+        while ((line = reader.readLine()) != null)
+             output.append(line).append("\n");
         process.waitFor();
 
         List<String> toReturn = new ArrayList<>();
-        Matcher matcher = PZB_FILE_PATTERN.matcher(output);
+        Matcher matcher = PZB_FILE_PATTERN.matcher(output.toString());
         while (matcher.find()) {
             String fileName = matcher.group(1);
             if (fileName.toLowerCase().contains("development")) {

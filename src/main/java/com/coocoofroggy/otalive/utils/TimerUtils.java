@@ -11,8 +11,7 @@ public class TimerUtils {
             Executors.newScheduledThreadPool(1);
 
     public static void runScannerEvery10Minutes() {
-        final Runnable beeper = PallasUtils::runScanner;
-        final ScheduledFuture<?> handle =
-                scheduler.scheduleAtFixedRate(beeper, 0, 10, MINUTES);
+        final Runnable scanner = PallasUtils::runScanner;
+        scheduler.scheduleAtFixedRate(scanner, 0, 1, MINUTES);
     }
 }
