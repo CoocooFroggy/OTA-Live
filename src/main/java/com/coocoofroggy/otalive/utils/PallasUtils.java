@@ -171,8 +171,14 @@ public class PallasUtils {
     private static List<String> listDevFiles(String urlString) throws IOException, InterruptedException {
         ProcessBuilder processBuilder = new ProcessBuilder("pzb", "-l", urlString);
         Process process = processBuilder.start();
+        BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()));
+        String output = "";
+        String line;
+        while ((line = reader.readLine()) != null) {
+             System.out.println("tasklist: " + line);
+             output += line + "\n";
+        }
         process.waitFor();
-        String output = IOUtils.toString(process.getInputStream(), StandardCharsets.UTF_8);
 
         List<String> toReturn = new ArrayList<>();
         Matcher matcher = PZB_FILE_PATTERN.matcher(output);
