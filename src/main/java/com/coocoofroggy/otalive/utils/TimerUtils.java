@@ -7,7 +7,7 @@ import java.util.concurrent.ScheduledFuture;
 import static java.util.concurrent.TimeUnit.MINUTES;
 
 public class TimerUtils {
-    private final ScheduledExecutorService scheduler =
+    private static final ScheduledExecutorService scheduler =
             Executors.newScheduledThreadPool(1);
 
     public static void runScannerEvery10Minutes() {
