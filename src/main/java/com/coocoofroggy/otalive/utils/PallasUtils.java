@@ -39,13 +39,6 @@ public class PallasUtils {
     private static final Gson gson = new Gson();
     private static final Pattern PZB_FILE_PATTERN = Pattern.compile(" f (.*)");
     private static final Logger LOGGER = LoggerFactory.getLogger(PallasUtils.class);
-    private static final String[] ASSET_AUDIENCES = new String[]{
-            "01c1d682-6e8f-4908-b724-5501fe3f5e5c", // Release
-            "a98cc469-7f15-4e60-aca5-11a26d60f1e7", // iOS 15 customer beta
-            "ce48f60c-f590-4157-a96f-41179ca08278", // iOS 15 public beta
-            "817ce601-f365-4294-8982-b00f547bbe4a", // iOS 16 customer beta
-            "a6050bca-50d8-4e45-adc2-f7333396a42c" // iOS 16 public beta
-    };
 
     public static String pallas(String device, String boardId, String assetAudience) throws IOException {
         Map<String, Object> requestMap = Map.of(
@@ -134,18 +127,21 @@ public class PallasUtils {
                 }
             }
             Main.jda.getPresence().setPresence(OnlineStatus.IDLE, null);
+            LOGGER.info("Scanner finished.");
         } catch (InterruptedException e) {
             // Wait 10 seconds, continue
             try {
                 TimeUnit.SECONDS.sleep(10);
             } catch (InterruptedException ex) {
                 Main.jda.getPresence().setPresence(OnlineStatus.IDLE, null);
+                LOGGER.info("Scanner finished.");
                 throw new RuntimeException(ex);
             }
             runScanner();
             throw new RuntimeException(e);
         } catch (IOException e) {
             Main.jda.getPresence().setPresence(OnlineStatus.IDLE, null);
+            LOGGER.info("Scanner finished.");
             throw new RuntimeException(e);
         }
     }
