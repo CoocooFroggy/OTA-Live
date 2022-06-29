@@ -1,0 +1,111 @@
+iPhone6,1;N51AP;iPhone 5s
+iPhone6,2;N53AP;iPhone 5s
+iPhone7,1;N56AP;iPhone 6+
+iPhone7,2;N61AP;iPhone 6
+iPhone8,1;N71AP;iPhone 6s
+iPhone8,1;N71mAP;iPhone 6s
+iPhone8,2;N66AP;iPhone 6s+
+iPhone8,2;N66mAP;iPhone 6s+
+iPhone8,4;N69AP;iPhone SE
+iPhone8,4;N69uAP;iPhone SE
+iPhone9,1;D10AP;iPhone 7
+iPhone9,2;D11AP;iPhone 7+
+iPhone9,3;D101AP;iPhone 7
+iPhone9,4;D111AP;iPhone 7+
+iPhone10,1;D20AP;iPhone 8
+iPhone10,1;D20AAP;iPhone 8
+iPhone10,2;D21AP;iPhone 8+
+iPhone10,2;D21AAP;iPhone 8+
+iPhone10,3;D22AP;iPhone X
+iPhone10,4;D201AP;iPhone 8
+iPhone10,4;D201AAP;iPhone 8
+iPhone10,5;D211AP;iPhone 8+
+iPhone10,5;D211AAP;iPhone 8+
+iPhone10,6;D221AP;iPhone X
+iPhone11,2;D321AP;iPhone XS
+iPhone11,4;D331AP;iPhone XS Max
+iPhone11,6;D331pAP;iPhone XS Max
+iPhone11,8;N841AP;iPhone XR
+iPhone12,1;N104AP;iPhone 11
+iPhone12,3;D421AP;iPhone 11 Pro
+iPhone12,5;D431AP;iPhone 11 Pro Max
+iPhone12,8;D79AP;iPhone SE 2
+iPhone13,1;D52gAP;iPhone 12 mini
+iPhone13,2;D53gAP;iPhone 12
+iPhone13,3;D53pAP;iPhone 12 Pro
+iPhone13,4;D54pAP;iPhone 12 Pro Max
+iPhone14,2;D63AP;iPhone 13 Pro
+iPhone14,3;D64AP;iPhone 13 Pro Max
+iPhone14,4;D16AP;iPhone 13 mini
+iPhone14,5;D17AP;iPhone 13
+iPhone14,6;D49AP;iPhone SE 3
+
+iPod7,1;N102AP;iPod touch 6
+iPod9,1;N112AP;iPod touch 7
+
+iPad6,11;J71sAP;iPad 5
+iPad6,11;J71tAP;iPad 5
+iPad6,12;J72sAP;iPad 5
+iPad6,12;J72tAP;iPad 5
+iPad7,5;J71bAP;iPad 6
+iPad7,6;J72bAP;iPad 6
+iPad7,11;J171AP;iPad 7
+iPad7,12;J172AP;iPad 7
+iPad11,6;J171aAP;iPad 8
+iPad11,7;J172aAP;iPad 8
+iPad12,1;J181AP;iPad 9
+iPad12,2;J182AP;iPad 9
+
+iPad4,1;J71AP;iPad Air 1
+iPad4,2;J72AP;iPad Air 1
+iPad4,3;J73AP;iPad Air 1
+iPad5,3;J81AP;iPad Air 2
+iPad5,4;J82AP;iPad Air 2
+iPad11,3;J217AP;iPad Air 3
+iPad11,4;J218AP;iPad Air 3
+iPad13,1;J307AP;iPad Air 4
+iPad13,2;J308AP;iPad Air 4
+iPad13,16;J407AP;iPad Air 5
+iPad13,17;J408AP;iPad Air 5
+
+iPad4,4;J85AP;iPad mini 2
+iPad4,5;J86AP;iPad mini 2
+iPad4,6;J87AP;iPad mini 2
+iPad4,7;J85mAP;iPad mini 3
+iPad4,8;J86mAP;iPad mini 3
+iPad4,9;J87mAP;iPad mini 3
+iPad5,1;J96AP;iPad mini 4
+iPad5,2;J97AP;iPad mini 4
+iPad11,1;J210AP;iPad mini 5
+iPad11,2;J211AP;iPad mini 5
+iPad14,1;J310AP;iPad mini 6
+iPad14,2;J311AP;iPad mini 6
+
+iPad6,3;J127AP;iPad Pro 1 (9.7")
+iPad6,4;J128AP;iPad Pro 1 (9.7")
+iPad6,7;J98aAP;iPad Pro 1 (12.9")
+iPad6,8;J99aAP;iPad Pro 1 (12.9")
+iPad7,1;J120AP;iPad Pro 2 (12.9")
+iPad7,2;J121AP;iPad Pro 2 (12.9")
+iPad7,3;J207AP;iPad Pro 2 (10.5")
+iPad7,4;J208AP;iPad Pro 2 (10.5")
+iPad8,1;J317AP;iPad Pro 3 (11.0")
+iPad8,2;J317xAP;iPad Pro 3 (11.0")
+iPad8,3;J318AP;iPad Pro 3 (11.0")
+iPad8,4;J318xAP;iPad Pro 3 (11.0")
+iPad8,5;J320AP;iPad Pro 3 (12.9")
+iPad8,6;J320xAP;iPad Pro 3 (12.9")
+iPad8,7;J321AP;iPad Pro 3 (12.9")
+iPad8,8;J321xAP;iPad Pro 3 (12.9")
+iPad8,9;J417AP;iPad Pro 4 (11.0")
+iPad8,10;J418AP;iPad Pro 4 (11.0")
+iPad8,11;J420AP;iPad Pro 4 (12.9")
+iPad8,12;J421AP;iPad Pro 4 (12.9")
+iPad13,4;J517AP;iPad Pro 5 (11.0")
+iPad13,5;J517xAP;iPad Pro 5 (11.0")
+iPad13,6;J518AP;iPad Pro 5 (11.0")
+iPad13,7;J518xAP;iPad Pro 5 (11.0")
+iPad13,8;J522AP;iPad Pro 5 (12.9")
+iPad13,9;J522xAP;iPad Pro 5 (12.9")
+iPad13,10;J523AP;iPad Pro 5 (12.9")
+iPad13,11;J523xAP;iPad Pro 5 (12.9")
