@@ -148,11 +148,11 @@ public class PallasUtils {
     // region Partial Zip
 
     private static final Pattern PZB_FILE_PATTERN = Pattern.compile(" f (.*)");
-    private static final String[] DEV_REGEXES = new String[]{
-            "development", "kasan", "debug", "diag", "factory", "device_map", "dev\\.im4p"
+    private static final String[] DEV_KEYWORDS = new String[]{
+            "development", "kasan", "debug", "diag", "factory", "device_map", "dev.im4p"
     };
     private static final String[] SPECIAL_CASE = new String[]{
-            "DeviceTree", "iBoot", "LLB", "sep-firmware", "iBEC", "iBSS"
+            "DeviceTree", "iBoot", "LLB", "sep-firmware", "iBEC", "iBSS", "diag"
     };
 
     private static List<String> listDevFiles(String urlString, String boardId) throws IOException, InterruptedException {
@@ -170,19 +170,21 @@ public class PallasUtils {
         lineLabel:
         while (matcher.find()) {
             String fileName = matcher.group(1);
-            for (String regex : DEV_REGEXES) {
+            for (String keyword : DEV_KEYWORDS) {
                 // If it's a dev file
-                if (fileName.toLowerCase().matches(regex)) {
+                if (fileName.toLowerCase().contains(keyword)) {
                     // Check for special case
                     for (String s : SPECIAL_CASE) {
                         if (fileName.contains(s)) {
                             // Only add it to the list of dev files if it matches our board ID
-                            if (fileName.contains(boardId.substring(0, 4)))
+                            if (fileName.toLowerCase().contains(boardId.substring(0, 4).toLowerCase()))
                                 devFiles.add(fileName);
                             // It will only match one special case—no need to check others
                             continue lineLabel;
                         }
                     }
+                    // if it's a plist file we don't care
+                    if (fileName.endsWith(".plist")) continue lineLabel;
                     // It's not a special case if we reach here
                     devFiles.add(fileName);
                     // Go to next line—we already found match
