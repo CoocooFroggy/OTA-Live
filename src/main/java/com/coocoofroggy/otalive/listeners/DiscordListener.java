@@ -14,6 +14,8 @@ import java.util.stream.Collectors;
 public class DiscordListener extends ListenerAdapter {
     @Override
     public void onSlashCommandInteraction(@NotNull SlashCommandInteractionEvent event) {
+        if (!event.getUser().getId().equals("353561670934855681"))
+            event.reply("You must be CoocooFroggy to use commands lol").setEphemeral(true).queue();
         switch (event.getName()) {
             case "audience" -> {
                 assert event.getSubcommandName() != null; // Always has a subcommand
