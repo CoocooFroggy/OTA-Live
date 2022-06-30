@@ -19,6 +19,7 @@ WORKDIR $APP_HOME
 COPY --from=TEMP_BUILD_IMAGE $APP_HOME/build/libs/$ARTIFACT_NAME .
 COPY AppleROOTCA.pem .
 COPY devices.txt .
+
 RUN apt-get update
 RUN apt-get install -y \
     autoconf \

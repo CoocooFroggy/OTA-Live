@@ -2,8 +2,10 @@ package com.coocoofroggy.otalive.utils;
 
 import com.coocoofroggy.otalive.Main;
 import com.coocoofroggy.otalive.objects.Asset;
+import com.coocoofroggy.otalive.objects.BuildIdentity;
 import com.coocoofroggy.otalive.objects.GlobalObject;
 import com.coocoofroggy.otalive.objects.PallasResponse;
+import com.dd.plist.PropertyListFormatException;
 import com.google.gson.Gson;
 import net.dv8tion.jda.api.EmbedBuilder;
 import net.dv8tion.jda.api.OnlineStatus;
@@ -21,16 +23,18 @@ import org.apache.http.impl.client.CloseableHttpClient;
 import org.apache.http.impl.client.HttpClients;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.xml.sax.SAXException;
 
+import javax.xml.parsers.ParserConfigurationException;
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
+import java.text.ParseException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.TimeUnit;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
@@ -38,75 +42,103 @@ import java.util.stream.Collectors;
 public class PallasUtils {
     private static final Gson gson = new Gson();
     private static final Logger LOGGER = LoggerFactory.getLogger(PallasUtils.class);
+    private static final Pattern PZB_FILE_PATTERN = Pattern.compile(" f (.*)");
+    private static final String[] DEV_KEYWORDS = new String[]{
+            "development", "kasan", "debug", "diag", "factory", "device_map", "dev.im4p"
+    };
+    private static final String[] SPECIAL_CASE = new String[]{
+            "DeviceTree", "iBoot", "LLB", "sep-firmware", "iBEC", "iBSS", "diag"
+    };
 
-    public static void runScanner() {
-        LOGGER.info("Starting scanner...");
-        Main.jda.getPresence().setPresence(OnlineStatus.ONLINE, Activity.playing("scanning..."));
-        GlobalObject globalObject = MongoUtils.fetchGlobalObject();
-        try {
-            List<String> lines = FileUtils.readLines(new File("devices.txt"), StandardCharsets.UTF_8);
-            for (String line : lines) {
-                if (line.isBlank()) continue;
-                String[] split = line.split(";");
-                String device = split[0];
-                String boardId = split[1];
-                String deviceHumanName = split[2];
+    // region Partial Zip
 
-                for (String assetAudience : globalObject.getAssetAudiences()) {
-                    String responseString = pallas(device, boardId, assetAudience);
-                    PallasResponse pallasResponse = parseJwt(responseString);
-                    for (Asset asset : pallasResponse.getAssets()) {
-                        LOGGER.info(asset.getBuildId() + " " + asset.getSupportedDevicesPretty());
-                        List<String> processedBuildIdDeviceCombos = globalObject.getProcessedBuildIdDeviceCombo();
-                        // If this is a new build ID & device combo, process it
-                        if (!processedBuildIdDeviceCombos.contains(asset.uniqueComboString())) {
-                            Guild guild = Main.jda.getGuildById(globalObject.getGuildId());
-                            TextChannel channel = guild.getTextChannelById(globalObject.getChannelId());
+    public static boolean runGdmfScanner() {
+        boolean newFirmwareReleased = false;
 
-                            EmbedBuilder embedBuilder = new EmbedBuilder();
-                            // iOS16Beta2 (20ABCD) — iPhone11,8
-                            embedBuilder.setTitle(asset.getLongName() + " — " + asset.getSupportedDevicesPretty())
-                                    .addField("Build ID", asset.getBuildId(), true)
-                                    .addField("OS Version", asset.getOsVersion(), true)
-                                    .addField("Device Name", deviceHumanName, true)
-                                    .addField("URL", asset.getFullUrl(), false);
+        int attempts = 0;
+        int maxAttempts = 3;
 
-                            // Send initial message
-                            Message message = channel.sendMessageEmbeds(embedBuilder.build()).complete();
+        while (true) {
+            LOGGER.info("Starting scanner...");
+            Main.jda.getPresence().setPresence(OnlineStatus.ONLINE, Activity.playing("scanning..."));
+            GlobalObject globalObject = MongoUtils.fetchGlobalObject();
+            try {
+                List<String> lines = FileUtils.readLines(new File("devices.txt"), StandardCharsets.UTF_8);
+                for (String line : lines) {
+                    if (line.isBlank() || line.startsWith("//")) continue;
+                    String[] split = line.split(";");
+                    String device = split[0];
+                    String boardId = split[1];
+                    String deviceHumanName = split[2];
 
-                            // Scan for dev files
-                            List<String> devFiles = listDevFiles(asset.getFullUrl(), boardId);
-                            String collect = "None found";
-                            if (!devFiles.isEmpty())
-                                collect = devFiles.stream().collect(Collectors.joining("`\n`", "`", "`"));
-                            embedBuilder.setDescription("**Dev Files**\n" + collect.substring(0, Math.min(4081, collect.length())));
+                    for (String assetAudience : globalObject.getAssetAudiences()) {
+                        String responseString = pallas(device, boardId, assetAudience);
+                        PallasResponse pallasResponse = parseJwt(responseString);
+                        for (Asset asset : pallasResponse.getAssets()) {
+                            List<String> processedBuildIdDeviceCombos = globalObject.getProcessedBuildIdDeviceCombo();
+                            // If this is a new build ID & device combo, process it
+                            if (!processedBuildIdDeviceCombos.contains(asset.uniqueComboString())) {
+                                LOGGER.info("NEW: " + asset.getBuildId() + " " + asset.getSupportedDevicesPretty());
+                                newFirmwareReleased = true;
+                                Guild guild = Main.jda.getGuildById(globalObject.getGuildId());
+                                TextChannel channel = guild.getTextChannelById(globalObject.getChannelId());
 
-                            // Update the message
-                            message.editMessageEmbeds(embedBuilder.build()).queue();
+                                EmbedBuilder embedBuilder = new EmbedBuilder();
+                                // iOS16Beta2 — iPhone11,8
+                                embedBuilder.setTitle(asset.getLongName() + " — " + asset.getSupportedDevicesPretty())
+                                        .addField("Build ID", asset.getBuildId(), true)
+                                        .addField("OS Version", asset.getOsVersion(), true)
+                                        .addField("Device Name", deviceHumanName, true)
+                                        .addField("URL", asset.getFullUrl(), false);
 
-                            globalObject.getProcessedBuildIdDeviceCombo().add(asset.uniqueComboString());
-                            MongoUtils.replaceGlobalObject(globalObject);
+                                // Send initial message
+                                Message message = channel.sendMessageEmbeds(embedBuilder.build()).complete();
+
+                                // Scan for dev files
+                                List<String> devFiles = listDevFiles(asset.getFullUrl(), boardId);
+                                String collect = "None found";
+                                if (!devFiles.isEmpty())
+                                    collect = devFiles.stream().collect(Collectors.joining("`\n`", "`", "`"));
+                                embedBuilder.setDescription("**Dev Files**\n" + collect.substring(0, Math.min(4081, collect.length())));
+
+                                // Update the message
+                                message.editMessageEmbeds(embedBuilder.build()).queue();
+
+                                globalObject.getProcessedBuildIdDeviceCombo().add(asset.uniqueComboString());
+                                MongoUtils.replaceGlobalObject(globalObject);
+
+                                // Add info to DB that will allow us to check if it's signed
+                                TssUtils.downloadBmFromUrl(asset.getFullUrl());
+                                BuildIdentity buildIdentity = TssUtils.dataFromBm(boardId);
+                                // Should never trigger. But just in case
+                                if (buildIdentity == null) {
+                                    channel.sendMessage("<@353561670934855681> couldn't parse data from BM 🚨.").queue();
+                                    continue;
+                                }
+                                buildIdentity.setAsset(asset);
+                                MongoUtils.insertBuildIdentity(buildIdentity);
+                            } else {
+                                LOGGER.info("Old: " + asset.getBuildId() + " " + asset.getSupportedDevicesPretty());
+                            }
                         }
                     }
                 }
-            }
-            Main.jda.getPresence().setPresence(OnlineStatus.IDLE, null);
-            LOGGER.info("Scanner finished.");
-        } catch (InterruptedException e) {
-            // Wait 10 seconds, continue
-            try {
-                TimeUnit.SECONDS.sleep(10);
-            } catch (InterruptedException ex) {
                 Main.jda.getPresence().setPresence(OnlineStatus.IDLE, null);
                 LOGGER.info("Scanner finished.");
-                throw new RuntimeException(ex);
+                return newFirmwareReleased; // Otherwise we'd be stuck in infinite while true loop
+            } catch (InterruptedException e) {
+                // Try again (because of while true loop) but on third try, just quit
+                if (++attempts > maxAttempts) {
+                    LOGGER.error("Interrupted. Quitting, max attempts was three.");
+                    throw new RuntimeException(e);
+                }
+                LOGGER.error("Interrupted. Trying again.");
+            } catch (IOException | PropertyListFormatException | ParseException | ParserConfigurationException |
+                     SAXException e) {
+                Main.jda.getPresence().setPresence(OnlineStatus.IDLE, null);
+                LOGGER.error("Scanner terminated early.");
+                throw new RuntimeException(e);
             }
-            runScanner();
-            throw new RuntimeException(e);
-        } catch (IOException e) {
-            Main.jda.getPresence().setPresence(OnlineStatus.IDLE, null);
-            LOGGER.info("Scanner finished.");
-            throw new RuntimeException(e);
         }
     }
 
@@ -144,16 +176,6 @@ public class PallasUtils {
         String decoded = new String(Base64.decodeBase64(meat), StandardCharsets.UTF_8);
         return gson.fromJson(decoded, PallasResponse.class);
     }
-
-    // region Partial Zip
-
-    private static final Pattern PZB_FILE_PATTERN = Pattern.compile(" f (.*)");
-    private static final String[] DEV_KEYWORDS = new String[]{
-            "development", "kasan", "debug", "diag", "factory", "device_map", "dev.im4p"
-    };
-    private static final String[] SPECIAL_CASE = new String[]{
-            "DeviceTree", "iBoot", "LLB", "sep-firmware", "iBEC", "iBSS", "diag"
-    };
 
     private static List<String> listDevFiles(String urlString, String boardId) throws IOException, InterruptedException {
         ProcessBuilder processBuilder = new ProcessBuilder("pzb", "-l", urlString);

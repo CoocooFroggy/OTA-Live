@@ -1,8 +1,12 @@
 package com.coocoofroggy.otalive.listeners;
 
+import com.coocoofroggy.otalive.Main;
 import com.coocoofroggy.otalive.objects.GlobalObject;
 import com.coocoofroggy.otalive.utils.MongoUtils;
 import com.coocoofroggy.otalive.utils.PallasUtils;
+import com.coocoofroggy.otalive.utils.TssUtils;
+import net.dv8tion.jda.api.entities.Guild;
+import net.dv8tion.jda.api.entities.TextChannel;
 import net.dv8tion.jda.api.events.interaction.command.SlashCommandInteractionEvent;
 import net.dv8tion.jda.api.hooks.ListenerAdapter;
 import org.jetbrains.annotations.NotNull;
@@ -50,9 +54,24 @@ public class DiscordListener extends ListenerAdapter {
                     }
                 }
             }
-            case "force-run" -> {
-                event.reply("Running").setEphemeral(true).queue();
-                PallasUtils.runScanner();
+            case "debug" -> {
+                assert event.getSubcommandName() != null; // Always has a subcommand
+                switch (event.getSubcommandName()) {
+                    case "force-run" -> {
+                        event.reply("Running").setEphemeral(true).queue();
+                        boolean gdmfScanResult = PallasUtils.runGdmfScanner();
+                        boolean tssScanResult = TssUtils.runTssScanner();
+                        if (gdmfScanResult || tssScanResult) {
+                            GlobalObject globalObject = MongoUtils.fetchGlobalObject();
+                            Guild guild = Main.jda.getGuildById(globalObject.getGuildId());
+                            TextChannel channel = guild.getTextChannelById(globalObject.getChannelId());
+                            channel.sendMessageEmbeds(TssUtils.signedFirmwareEmbed().build()).queue();
+                        }
+                    }
+                    case "signing-status" -> {
+                        event.replyEmbeds(TssUtils.signedFirmwareEmbed().build()).queue();
+                    }
+                }
             }
         }
     }

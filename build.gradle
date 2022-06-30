@@ -33,4 +33,6 @@ dependencies {
     implementation group: 'commons-io', name: 'commons-io', version: '2.11.0'
     // https://mvnrepository.com/artifact/org.apache.commons/commons-compress
     implementation group: 'org.apache.commons', name: 'commons-compress', version: '1.21'
+    // https://mvnrepository.com/artifact/com.googlecode.plist/dd-plist
+    implementation group: 'com.googlecode.plist', name: 'dd-plist', version: '1.23'
 }

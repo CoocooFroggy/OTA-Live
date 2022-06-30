@@ -33,8 +33,8 @@ public class Main {
         } catch (KeyStoreException | CertificateException | IOException | NoSuchAlgorithmException e) {
             throw new RuntimeException(e);
         }
-        startBot();
         MongoUtils.connectToDb();
+        startBot();
         new Thread(Main::upsertAllCommands).start();
         TimerUtils.runScannerEvery10Minutes();
     }
@@ -49,7 +49,10 @@ public class Main {
                                 .addOption(OptionType.STRING, "asset-audience", "The asset audience to remove", true),
                         new SubcommandData("list", "Lists asset audiences"))
                 .complete();
-        jda.upsertCommand("force-run", "Force runs the scanner")
+        jda.upsertCommand("debug", "Debug commands")
+                .addSubcommands(
+                        new SubcommandData("force-run", "Force runs the scanner"),
+                        new SubcommandData("signing-status", "Sends the embed with signing status"))
                 .complete();
         logger.info("Commands updated.");
     }
