@@ -205,8 +205,8 @@ public class PallasUtils {
                             continue lineLabel;
                         }
                     }
-                    // if it's a plist file we don't care
-                    if (fileName.endsWith(".im4p.plist")) continue lineLabel;
+                    // if it's a plist file we usually don't care
+                    if (fileName.endsWith(".plist") && !fileName.contains("device_map")) continue lineLabel;
                     // It's not a special case if we reach here
                     devFiles.add(fileName);
                     // Go to next line—we already found match
