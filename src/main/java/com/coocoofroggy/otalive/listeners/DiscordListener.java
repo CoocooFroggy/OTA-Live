@@ -18,10 +18,10 @@ import java.util.stream.Collectors;
 public class DiscordListener extends ListenerAdapter {
     @Override
     public void onSlashCommandInteraction(@NotNull SlashCommandInteractionEvent event) {
-        if (!event.getUser().getId().equals("353561670934855681"))
-            event.reply("You must be CoocooFroggy to use commands lol").setEphemeral(true).queue();
         switch (event.getName()) {
             case "audience" -> {
+                if (!event.getUser().getId().equals("353561670934855681"))
+                    event.reply("You must be CoocooFroggy to use commands lol").setEphemeral(true).queue();
                 assert event.getSubcommandName() != null; // Always has a subcommand
                 switch (event.getSubcommandName()) {
                     case "add" -> {
@@ -58,6 +58,8 @@ public class DiscordListener extends ListenerAdapter {
                 assert event.getSubcommandName() != null; // Always has a subcommand
                 switch (event.getSubcommandName()) {
                     case "force-run" -> {
+                        if (!event.getUser().getId().equals("353561670934855681"))
+                            event.reply("You must be CoocooFroggy to use commands lol").setEphemeral(true).queue();
                         event.reply("Running").setEphemeral(true).queue();
                         boolean gdmfScanResult = PallasUtils.runGdmfScanner();
                         boolean tssScanResult = TssUtils.runTssScanner();

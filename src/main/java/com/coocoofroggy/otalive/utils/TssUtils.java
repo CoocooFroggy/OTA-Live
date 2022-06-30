@@ -41,7 +41,7 @@ public class TssUtils {
             <plist version="1.0">
                 <dict>
                     <key>ApECID</key>
-                    <integer>0</integer>
+                    <integer>1</integer>
                     <key>UniqueBuildID</key>
                     <data>{{UBID}}</data>
                     <key>ApChipID</key>
