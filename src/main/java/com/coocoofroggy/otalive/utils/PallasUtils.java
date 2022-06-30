@@ -129,6 +129,7 @@ public class PallasUtils {
             } catch (InterruptedException e) {
                 // Try again (because of while true loop) but on third try, just quit
                 if (++attempts > maxAttempts) {
+                    Main.jda.getPresence().setPresence(OnlineStatus.IDLE, null);
                     LOGGER.error("Interrupted. Quitting, max attempts was three.");
                     throw new RuntimeException(e);
                 }

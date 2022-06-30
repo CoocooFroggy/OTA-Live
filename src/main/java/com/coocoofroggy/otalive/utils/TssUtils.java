@@ -6,6 +6,8 @@ import com.coocoofroggy.otalive.objects.BuildIdentity;
 import com.coocoofroggy.otalive.objects.GlobalObject;
 import com.dd.plist.*;
 import net.dv8tion.jda.api.EmbedBuilder;
+import net.dv8tion.jda.api.OnlineStatus;
+import net.dv8tion.jda.api.entities.Activity;
 import net.dv8tion.jda.api.entities.Guild;
 import net.dv8tion.jda.api.entities.Message;
 import net.dv8tion.jda.api.entities.TextChannel;
@@ -118,12 +120,14 @@ public class TssUtils {
 
         while (true) {
             LOGGER.info("Starting TSS scanner...");
+            Main.jda.getPresence().setPresence(OnlineStatus.ONLINE, Activity.playing("checking TSS..."));
             List<BuildIdentity> buildIdentities = null;
             try {
                 buildIdentities = MongoUtils.fetchAllSignedBuildIdentities();
             } catch (Exception e) {
                 // Try again (because of while true loop) but on third try, just quit
                 if (++attempts > maxAttempts) {
+                    Main.jda.getPresence().setPresence(OnlineStatus.IDLE, null);
                     LOGGER.error("Interrupted. Quitting, max attempts was three.");
                     throw new RuntimeException(e);
                 }
@@ -159,6 +163,7 @@ public class TssUtils {
                     LOGGER.info("Continuing anyways.");
                 }
             }
+            Main.jda.getPresence().setPresence(OnlineStatus.IDLE, null);
             LOGGER.info("Finished scanning TSS.");
             return somethingGotUnsigned;
         }
