@@ -1,8 +1,14 @@
 package com.coocoofroggy.otalive.utils;
 
+import com.coocoofroggy.otalive.Main;
+import com.coocoofroggy.otalive.objects.Asset;
 import com.coocoofroggy.otalive.objects.BuildIdentity;
+import com.coocoofroggy.otalive.objects.GlobalObject;
 import com.dd.plist.*;
 import net.dv8tion.jda.api.EmbedBuilder;
+import net.dv8tion.jda.api.entities.Guild;
+import net.dv8tion.jda.api.entities.Message;
+import net.dv8tion.jda.api.entities.TextChannel;
 import org.apache.commons.io.IOUtils;
 import org.apache.http.client.methods.CloseableHttpResponse;
 import org.apache.http.client.methods.HttpPost;
@@ -125,13 +131,28 @@ public class TssUtils {
                 continue;
             }
             for (BuildIdentity buildIdentity : buildIdentities) {
-                LOGGER.info("Checking if " + buildIdentity.getAsset().getBuildId() + " " + buildIdentity.getAsset().getSupportedDevicesPretty() + " is unsigned...");
+                Asset asset = buildIdentity.getAsset();
+                LOGGER.info("Checking if " + asset.getBuildId() + " " + asset.getSupportedDevicesPretty() + " is unsigned...");
                 try {
                     boolean signed = tssCheckSigned(buildIdentity);
                     if (!signed) {
                         LOGGER.info("Marking as unsigned.");
                         MongoUtils.markBuildIdentityAsUnsigned(buildIdentity);
                         somethingGotUnsigned = true;
+
+                        // Notify us
+                        GlobalObject globalObject = MongoUtils.fetchGlobalObject();
+                        Guild guild = Main.jda.getGuildById(globalObject.getGuildId());
+                        TextChannel channel = guild.getTextChannelById(globalObject.getChannelId());
+
+                        EmbedBuilder embedBuilder = new EmbedBuilder();
+                        embedBuilder.setTitle("Unsigned: " + asset.getLongName() + " — " + asset.getSupportedDevicesPretty())
+                                .setColor(new Color(0xB00000))
+                                .addField("Build ID", asset.getBuildId(), true)
+                                .addField("OS Version", asset.getOsVersion(), true)
+                                .addField("URL", asset.getFullUrl(), false);
+
+                        channel.sendMessageEmbeds(embedBuilder.build()).queue();
                     }
                 } catch (IOException e) {
                     e.printStackTrace();

@@ -85,7 +85,7 @@ public class PallasUtils {
 
                                 EmbedBuilder embedBuilder = new EmbedBuilder();
                                 // iOS16Beta2 — iPhone11,8
-                                embedBuilder.setTitle(asset.getLongName() + " — " + asset.getSupportedDevicesPretty())
+                                embedBuilder.setTitle("Released: " + asset.getLongName() + " — " + asset.getSupportedDevicesPretty())
                                         .addField("Build ID", asset.getBuildId(), true)
                                         .addField("OS Version", asset.getOsVersion(), true)
                                         .addField("Device Name", deviceHumanName, true)
