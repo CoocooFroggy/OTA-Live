@@ -165,17 +165,17 @@ public class TssUtils {
     }
 
     public static EmbedBuilder signedFirmwareEmbed() {
-        HashMap<String, Integer> buildIdSignedDevicesCount = new HashMap<>();
+        HashMap<Asset, Integer> buildIdSignedDevicesCount = new HashMap<>();
         List<BuildIdentity> buildIdentities = MongoUtils.fetchAllSignedBuildIdentities();
         for (BuildIdentity buildIdentity : buildIdentities) {
-            Integer count = buildIdSignedDevicesCount.get(buildIdentity.getAsset().getBuildId());
+            Integer count = buildIdSignedDevicesCount.get(buildIdentity.getAsset());
             if (count == null) count = 0;
-            buildIdSignedDevicesCount.put(buildIdentity.getAsset().getBuildId(), count + 1);
+            buildIdSignedDevicesCount.put(buildIdentity.getAsset(), count + 1);
         }
 
         StringBuilder stringBuilder = new StringBuilder();
-        for (Map.Entry<String, Integer> entry : buildIdSignedDevicesCount.entrySet()) {
-            stringBuilder.append("`").append(entry.getKey()).append("`: ").append(entry.getValue()).append(" devices.\n");
+        for (Map.Entry<Asset, Integer> entry : buildIdSignedDevicesCount.entrySet()) {
+            stringBuilder.append(entry.getKey().getLongName()).append(" (`").append(entry.getKey().getBuildId()).append("`): ").append(entry.getValue()).append(" devices.\n");
         }
 
         EmbedBuilder embedBuilder = new EmbedBuilder();
