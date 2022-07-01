@@ -4,6 +4,7 @@ import com.coocoofroggy.otalive.Main;
 import com.coocoofroggy.otalive.objects.GlobalObject;
 import com.coocoofroggy.otalive.utils.MongoUtils;
 import com.coocoofroggy.otalive.utils.PallasUtils;
+import com.coocoofroggy.otalive.utils.TimerUtils;
 import com.coocoofroggy.otalive.utils.TssUtils;
 import net.dv8tion.jda.api.entities.Guild;
 import net.dv8tion.jda.api.entities.TextChannel;
@@ -61,14 +62,7 @@ public class DiscordListener extends ListenerAdapter {
                         if (!event.getUser().getId().equals("353561670934855681"))
                             event.reply("You must be CoocooFroggy to use commands lol").setEphemeral(true).queue();
                         event.reply("Running").setEphemeral(true).queue();
-                        boolean gdmfScanResult = PallasUtils.runGdmfScanner();
-                        boolean tssScanResult = TssUtils.runTssScanner();
-                        if (gdmfScanResult || tssScanResult) {
-                            GlobalObject globalObject = MongoUtils.fetchGlobalObject();
-                            Guild guild = Main.jda.getGuildById(globalObject.getGuildId());
-                            TextChannel channel = guild.getTextChannelById(globalObject.getChannelId());
-                            channel.sendMessageEmbeds(TssUtils.signedFirmwareEmbed().build()).queue();
-                        }
+                        TimerUtils.scanLoop();
                     }
                     case "signing-status" -> {
                         event.replyEmbeds(TssUtils.signedFirmwareEmbed().build()).queue();

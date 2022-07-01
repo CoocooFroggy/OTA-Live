@@ -17,6 +17,7 @@ import org.apache.http.client.methods.HttpPost;
 import org.apache.http.entity.StringEntity;
 import org.apache.http.impl.client.CloseableHttpClient;
 import org.apache.http.impl.client.HttpClients;
+import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.xml.sax.SAXException;
@@ -112,14 +113,14 @@ public class TssUtils {
         process.waitFor();
     }
 
-    public static boolean runTssScanner() {
+    public static boolean runTssScanner(GlobalObject globalObject) {
         boolean somethingGotUnsigned = false;
 
         int attempts = 0;
         int maxAttempts = 3;
 
         while (true) {
-            LOGGER.info("Starting TSS scanner...");
+            LOGGER.debug("Starting TSS scanner...");
             Main.jda.getPresence().setPresence(OnlineStatus.ONLINE, Activity.playing("checking TSS..."));
             List<BuildIdentity> buildIdentities = null;
             try {
@@ -136,16 +137,15 @@ public class TssUtils {
             }
             for (BuildIdentity buildIdentity : buildIdentities) {
                 Asset asset = buildIdentity.getAsset();
-                LOGGER.info("Checking if " + asset.getBuildId() + " " + asset.getSupportedDevicesPretty() + " is unsigned...");
+                LOGGER.debug("Checking if " + asset.getBuildId() + " " + asset.getSupportedDevicesPretty() + " is unsigned...");
                 try {
                     boolean signed = tssCheckSigned(buildIdentity);
                     if (!signed) {
-                        LOGGER.info("Marking as unsigned.");
+                        LOGGER.info("Marking " + asset.getBuildId() + " " + asset.getSupportedDevicesPretty() + " as unsigned.");
                         MongoUtils.markBuildIdentityAsUnsigned(buildIdentity);
                         somethingGotUnsigned = true;
 
                         // Notify us
-                        GlobalObject globalObject = MongoUtils.fetchGlobalObject();
                         Guild guild = Main.jda.getGuildById(globalObject.getGuildId());
                         TextChannel channel = guild.getTextChannelById(globalObject.getChannelId());
 
@@ -160,25 +160,17 @@ public class TssUtils {
                     }
                 } catch (IOException e) {
                     e.printStackTrace();
-                    LOGGER.info("Continuing anyways.");
+                    LOGGER.error("Continuing anyways.");
                 }
             }
             Main.jda.getPresence().setPresence(OnlineStatus.IDLE, null);
-            LOGGER.info("Finished scanning TSS.");
+            LOGGER.debug("Finished scanning TSS.");
             return somethingGotUnsigned;
         }
     }
 
     public static EmbedBuilder signedFirmwareEmbed() {
-        HashMap<String, Integer> buildIdSignedDevicesCount = new HashMap<>();
-        List<BuildIdentity> buildIdentities = MongoUtils.fetchAllSignedBuildIdentities();
-        for (BuildIdentity buildIdentity : buildIdentities) {
-            // iOS 155Long (`18A24`)
-            String key = buildIdentity.getAsset().getLongName() + " (`" + buildIdentity.getAsset().getBuildId() + "`)";
-            Integer count = buildIdSignedDevicesCount.get(key);
-            if (count == null) count = 0;
-            buildIdSignedDevicesCount.put(key, count + 1);
-        }
+        HashMap<String, Integer> buildIdSignedDevicesCount = getBuildIdSignedDevicesCount();
 
         StringBuilder stringBuilder = new StringBuilder();
         for (Map.Entry<String, Integer> entry : buildIdSignedDevicesCount.entrySet()) {
@@ -190,5 +182,46 @@ public class TssUtils {
                 .setColor(new Color(0x38C700))
                 .setDescription(stringBuilder.toString());
         return embedBuilder;
+    }
+
+    public static EmbedBuilder signedFirmwareEmbed(HashMap<String, Integer> initialBuildIdSignedDevicesCount) {
+        HashMap<String, Integer> buildIdSignedDevicesCount = getBuildIdSignedDevicesCount();
+
+        StringBuilder stringBuilder = new StringBuilder();
+        for (Map.Entry<String, Integer> entry : buildIdSignedDevicesCount.entrySet()) {
+            // If there is a new firmware added
+            if (!initialBuildIdSignedDevicesCount.containsKey(entry.getKey()))
+                stringBuilder.append("NEW → ");
+            // If it's not a new firmware, but the values are different
+            else if (!initialBuildIdSignedDevicesCount.get(entry.getKey()).equals(entry.getValue()))
+                stringBuilder.append("CHANGED → ");
+            stringBuilder.append(entry.getKey()).append(": ").append(entry.getValue()).append(" devices.\n");
+        }
+        // Check if anything was unsigned, and say so
+        for (Map.Entry<String, Integer> entry : initialBuildIdSignedDevicesCount.entrySet()) {
+            // If the current buildIdSignedDevicesCount doesn't have a key that was there initially, it got unsigned
+            if (!buildIdSignedDevicesCount.containsKey(entry.getKey()))
+                stringBuilder.append("UNSIGNED → ").append(entry.getKey()).append(": ").append(entry.getValue()).append(" devices.\n");
+        }
+
+        EmbedBuilder embedBuilder = new EmbedBuilder();
+        embedBuilder.setTitle("Signed OTAs")
+                .setColor(new Color(0x38C700))
+                .setDescription(stringBuilder.toString());
+        return embedBuilder;
+    }
+
+    @NotNull
+    public static HashMap<String, Integer> getBuildIdSignedDevicesCount() {
+        HashMap<String, Integer> buildIdSignedDevicesCount = new HashMap<>();
+        List<BuildIdentity> buildIdentities = MongoUtils.fetchAllSignedBuildIdentities();
+        for (BuildIdentity buildIdentity : buildIdentities) {
+            // iOS 155Long (`18A24`)
+            String key = buildIdentity.getAsset().getLongName() + " (`" + buildIdentity.getAsset().getBuildId() + "`)";
+            Integer count = buildIdSignedDevicesCount.get(key);
+            if (count == null) count = 0;
+            buildIdSignedDevicesCount.put(key, count + 1);
+        }
+        return buildIdSignedDevicesCount;
     }
 }

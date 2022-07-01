@@ -52,16 +52,15 @@ public class PallasUtils {
 
     // region Partial Zip
 
-    public static boolean runGdmfScanner() {
+    public static boolean runGdmfScanner(GlobalObject globalObject) {
         boolean newFirmwareReleased = false;
 
         int attempts = 0;
         int maxAttempts = 3;
 
         while (true) {
-            LOGGER.info("Starting scanner...");
+            LOGGER.debug("Starting scanner...");
             Main.jda.getPresence().setPresence(OnlineStatus.ONLINE, Activity.playing("scanning..."));
-            GlobalObject globalObject = MongoUtils.fetchGlobalObject();
             try {
                 List<String> lines = FileUtils.readLines(new File("devices.txt"), StandardCharsets.UTF_8);
                 for (String line : lines) {
@@ -118,13 +117,13 @@ public class PallasUtils {
                                 buildIdentity.setAsset(asset);
                                 MongoUtils.insertBuildIdentity(buildIdentity);
                             } else {
-                                LOGGER.info("Old: " + asset.getBuildId() + " " + asset.getSupportedDevicesPretty());
+                                LOGGER.debug("Old: " + asset.getBuildId() + " " + asset.getSupportedDevicesPretty());
                             }
                         }
                     }
                 }
                 Main.jda.getPresence().setPresence(OnlineStatus.IDLE, null);
-                LOGGER.info("Scanner finished.");
+                LOGGER.debug("Scanner finished.");
                 return newFirmwareReleased; // Otherwise we'd be stuck in infinite while true loop
             } catch (InterruptedException e) {
                 // Try again (because of while true loop) but on third try, just quit
