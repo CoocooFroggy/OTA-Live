@@ -136,7 +136,7 @@ public class PallasUtils {
             } catch (IOException | PropertyListFormatException | ParseException | ParserConfigurationException |
                      SAXException e) {
                 Main.jda.getPresence().setPresence(OnlineStatus.IDLE, null);
-                LOGGER.error("Scanner terminated early.", e);
+                LOGGER.error("Scanner terminated early.");
                 throw new RuntimeException(e);
             }
         }
