@@ -132,11 +132,11 @@ public class PallasUtils {
                     LOGGER.error("Interrupted. Quitting, max attempts was three.");
                     throw new RuntimeException(e);
                 }
-                LOGGER.error("Interrupted. Trying again.");
+                LOGGER.error("Interrupted. Trying again.", e);
             } catch (IOException | PropertyListFormatException | ParseException | ParserConfigurationException |
                      SAXException e) {
                 Main.jda.getPresence().setPresence(OnlineStatus.IDLE, null);
-                LOGGER.error("Scanner terminated early.");
+                LOGGER.error("Scanner terminated early.", e);
                 throw new RuntimeException(e);
             }
         }
