@@ -10,16 +10,16 @@ import org.slf4j.LoggerFactory;
 import java.util.HashMap;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.TimeUnit;
 
 public class TimerUtils {
     private static final Logger LOGGER = LoggerFactory.getLogger(TimerUtils.class);
     private static final ScheduledExecutorService scheduler =
             Executors.newScheduledThreadPool(1);
 
-    public static void runScannerEvery10Minutes() {
+    public static void startLoopScheduler() {
         final Runnable scanner = TimerUtils::scanLoop;
-        scheduler.scheduleAtFixedRate(scanner, 0, 1, TimeUnit.MINUTES);
+        // DEBUG
+//        scheduler.scheduleAtFixedRate(scanner, 0, 1, TimeUnit.MINUTES);
     }
 
     public static void scanLoop() {
@@ -29,7 +29,14 @@ public class TimerUtils {
             GlobalObject globalObject = MongoUtils.fetchGlobalObject();
             boolean gdmfScanResult = PallasUtils.runGdmfScanner(globalObject);
             boolean tssScanResult = TssUtils.runTssScanner(globalObject);
+            // If something was signed, unsigned, or changed
             if (gdmfScanResult || tssScanResult) {
+                // Keep running the scanners until everything settles
+                do {
+                    LOGGER.info("Running scanners again until everything settles.");
+                } while (PallasUtils.runGdmfScanner(globalObject) || TssUtils.runTssScanner(globalObject));
+
+                // Once everything is settled, send the embed with changes
                 Guild guild = Main.jda.getGuildById(globalObject.getGuildId());
                 TextChannel channel = guild.getTextChannelById(globalObject.getChannelId());
                 channel.sendMessageEmbeds(TssUtils.signedFirmwareEmbed(initialBuildIdSignedDevicesCount).build()).queue();

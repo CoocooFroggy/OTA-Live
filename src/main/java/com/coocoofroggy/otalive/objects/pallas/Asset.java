@@ -1,4 +1,4 @@
-package com.coocoofroggy.otalive.objects;
+package com.coocoofroggy.otalive.objects.pallas;
 
 import com.google.gson.annotations.SerializedName;
 
@@ -14,9 +14,13 @@ public class Asset {
     @SerializedName("Build")
     private String buildId;
     @SerializedName("SUDocumentationID")
-    private String longName;
+    private String suDocumentationId;
+    // Only exists on regular, not documentation, requests
     @SerializedName("SupportedDevices")
     private List<String> supportedDevices;
+
+    // Our own
+    private String humanReadableName;
 
     public Asset() {
     }
@@ -61,12 +65,12 @@ public class Asset {
         return this;
     }
 
-    public String getLongName() {
-        return longName;
+    public String getSuDocumentationId() {
+        return suDocumentationId;
     }
 
-    public Asset setLongName(String longName) {
-        this.longName = longName;
+    public Asset setSuDocumentationId(String suDocumentationId) {
+        this.suDocumentationId = suDocumentationId;
         return this;
     }
 
@@ -84,6 +88,15 @@ public class Asset {
     }
 
     public String uniqueComboString() {
-        return buildId + ";" + getSupportedDevicesPretty();
+        return getBuildId() + ";" + getSupportedDevicesPretty();
+    }
+
+    public String getHumanReadableName() {
+        return humanReadableName;
+    }
+
+    public Asset setHumanReadableName(String humanReadableName) {
+        this.humanReadableName = humanReadableName;
+        return this;
     }
 }

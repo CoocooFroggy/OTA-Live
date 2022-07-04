@@ -1,11 +1,11 @@
 package com.coocoofroggy.otalive.utils;
 
 import com.coocoofroggy.otalive.Main;
-import com.coocoofroggy.otalive.objects.Asset;
+import com.coocoofroggy.otalive.objects.pallas.Asset;
 import com.coocoofroggy.otalive.objects.BuildIdentity;
 import com.coocoofroggy.otalive.objects.GlobalObject;
-import com.coocoofroggy.otalive.objects.PallasResponse;
-import com.dd.plist.PropertyListFormatException;
+import com.coocoofroggy.otalive.objects.pallas.PallasResponse;
+import com.dd.plist.*;
 import com.google.gson.Gson;
 import net.dv8tion.jda.api.EmbedBuilder;
 import net.dv8tion.jda.api.OnlineStatus;
@@ -49,8 +49,7 @@ public class PallasUtils {
     private static final String[] SPECIAL_CASE = new String[]{
             "DeviceTree", "iBoot", "LLB", "sep-firmware", "iBEC", "iBSS", "diag"
     };
-
-    // region Partial Zip
+    public static final Pattern DEVICE_NAME_PATTERN = Pattern.compile("(.*?)\\d.*");
 
     public static boolean runGdmfScanner(GlobalObject globalObject) {
         boolean newFirmwareReleased = false;
@@ -63,6 +62,8 @@ public class PallasUtils {
             Main.jda.getPresence().setPresence(OnlineStatus.ONLINE, Activity.playing("scanning..."));
             try {
                 List<String> lines = FileUtils.readLines(new File("devices.txt"), StandardCharsets.UTF_8);
+
+                // Loop through all devices
                 for (String line : lines) {
                     if (line.isBlank() || line.startsWith("//")) continue;
                     String[] split = line.split(";");
@@ -70,10 +71,29 @@ public class PallasUtils {
                     String boardId = split[1];
                     String deviceHumanName = split[2];
 
+                    audienceLoopLabel:
                     for (String assetAudience : globalObject.getAssetAudiences()) {
-                        String responseString = pallas(device, boardId, assetAudience);
-                        PallasResponse pallasResponse = parseJwt(responseString);
-                        for (Asset asset : pallasResponse.getAssets()) {
+                        PallasResponse suPallasResponse;
+                        int suAttempts = 0;
+                        while (true) {
+                            // Get SU from GDMF
+                            String suResponseString = suRequest(device, boardId, assetAudience);
+                            suPallasResponse = parseJwt(suResponseString);
+                            // If there are no assets, retry
+                            if (suPallasResponse == null || suPallasResponse.getAssets().isEmpty()) {
+                                suAttempts++;
+                                // If we hit max attempts, just go on to next asset audience for this device
+                                if (suAttempts >= 3) {
+                                    continue audienceLoopLabel;
+                                }
+                                continue;
+                            }
+                            // Otherwise break out of loop: we have the assets
+                            break;
+                        }
+
+                        assetLoopLabel:
+                        for (Asset asset : suPallasResponse.getAssets()) {
                             List<String> processedBuildIdDeviceCombos = globalObject.getProcessedBuildIdDeviceCombo();
                             // If this is a new build ID & device combo, process it
                             if (!processedBuildIdDeviceCombos.contains(asset.uniqueComboString())) {
@@ -82,11 +102,44 @@ public class PallasUtils {
                                 Guild guild = Main.jda.getGuildById(globalObject.getGuildId());
                                 TextChannel channel = guild.getTextChannelById(globalObject.getChannelId());
 
+                                // Get device name
+                                Matcher matcher = DEVICE_NAME_PATTERN.matcher(device);
+                                // If there's no device name we messed up. But continue
+                                if (!matcher.find()) {
+                                    LOGGER.error("Cannot find device name for " + device);
+                                    continue;
+                                }
+
+                                PallasResponse docPallasResponse;
+                                int docAttempts = 0;
+                                while (true) {
+                                    // Get Documentation from GDMF
+                                    String docResponseString = docRequest(assetAudience, asset.getSuDocumentationId(), matcher.group(1));
+                                    docPallasResponse = parseJwt(docResponseString);
+                                    // If there are no assets, retry
+                                    if (docPallasResponse == null || docPallasResponse.getAssets().isEmpty()) {
+                                        docAttempts++;
+                                        // If we hit max attempts, just go on to next asset
+                                        if (docAttempts >= 3) {
+                                            continue assetLoopLabel;
+                                        }
+                                        continue;
+                                    }
+                                    // Otherwise break out of loop: we have the asset
+                                    break;
+                                }
+
+                                // Not iterating through assets because there should not be multiple documentations. Just use the first.
+                                // Get human-readable name
+                                File docStringsFile = downloadDocumentationStringsFromUrl(docPallasResponse.getAssets().get(0).getFullUrl());
+                                asset.setHumanReadableName(humanReadableFromDocStrings(docStringsFile));
+
                                 EmbedBuilder embedBuilder = new EmbedBuilder();
                                 // iOS16Beta2 — iPhone11,8
-                                embedBuilder.setTitle("Released: " + asset.getLongName() + " — " + asset.getSupportedDevicesPretty())
+                                embedBuilder.setTitle("Released: " + asset.getHumanReadableName() + " — " + asset.getSupportedDevicesPretty())
                                         .addField("Build ID", asset.getBuildId(), true)
                                         .addField("OS Version", asset.getOsVersion(), true)
+                                        .addField("SU Documentation ID", asset.getSuDocumentationId(), true)
                                         .addField("Device Name", deviceHumanName, true)
                                         .addField("URL", asset.getFullUrl(), false);
 
@@ -108,7 +161,7 @@ public class PallasUtils {
 
                                 // Add info to DB that will allow us to check if it's signed
                                 TssUtils.downloadBmFromUrl(asset.getFullUrl());
-                                BuildIdentity buildIdentity = TssUtils.dataFromBm(boardId);
+                                BuildIdentity buildIdentity = TssUtils.buildIdentityFromBm(boardId);
                                 // Should never trigger. But just in case
                                 if (buildIdentity == null) {
                                     channel.sendMessage("<@353561670934855681> couldn't parse data from BM 🚨.").queue();
@@ -142,7 +195,7 @@ public class PallasUtils {
         }
     }
 
-    public static String pallas(String device, String boardId, String assetAudience) throws IOException {
+    public static String suRequest(String device, String boardId, String assetAudience) throws IOException {
         Map<String, Object> requestMap = Map.of(
                 "ClientVersion", 2,
                 "AssetType", "com.apple.MobileAsset.SoftwareUpdate",
@@ -153,6 +206,30 @@ public class PallasUtils {
                 "ProductVersion", "0",
                 "BuildVersion", "0",
                 "CompatibilityVersion", 20
+        );
+        String s = gson.toJson(requestMap);
+
+        CloseableHttpClient client = HttpClients.createDefault();
+        HttpPost httpPost = new HttpPost("https://gdmf.apple.com/v2/assets");
+        httpPost.setEntity(new StringEntity(s));
+        httpPost.addHeader("Content-Type", "application/json");
+
+        CloseableHttpResponse response = client.execute(httpPost);
+        String responseString = IOUtils.toString(response.getEntity().getContent(), StandardCharsets.UTF_8);
+
+        response.close();
+        client.close();
+
+        return responseString;
+    }
+
+    public static String docRequest(String assetAudience, String suDocumentationId, String deviceName) throws IOException {
+        Map<String, Object> requestMap = Map.of(
+                "ClientVersion", 2,
+                "AssetType", "com.apple.MobileAsset.SoftwareUpdateDocumentation",
+                "AssetAudience", assetAudience,
+                "SUDocumentationID", suDocumentationId,
+                "DeviceName", deviceName // iPhone, iPad, iPod
         );
         String s = gson.toJson(requestMap);
 
@@ -217,5 +294,18 @@ public class PallasUtils {
         return devFiles;
     }
 
-    // endregion
+    public static File downloadDocumentationStringsFromUrl(String url) throws IOException, InterruptedException {
+        ProcessBuilder processBuilder = new ProcessBuilder("pzb", "-g", "AssetData/en.lproj/documentation.strings", url);
+        Process process = processBuilder.start();
+        BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()));
+        while (reader.readLine() != null);
+        process.waitFor();
+        return new File("documentation.strings");
+    }
+
+    public static String humanReadableFromDocStrings(File file) throws PropertyListFormatException, IOException, ParseException, ParserConfigurationException, SAXException {
+        NSDictionary rootDict = (NSDictionary) PropertyListParser.parse(file);
+        return rootDict.objectForKey("HumanReadableUpdateName").toString();
+    }
+
 }

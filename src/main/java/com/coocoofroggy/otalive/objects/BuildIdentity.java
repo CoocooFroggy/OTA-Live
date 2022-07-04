@@ -1,11 +1,13 @@
 package com.coocoofroggy.otalive.objects;
 
+import com.coocoofroggy.otalive.objects.pallas.Asset;
+
 public class BuildIdentity {
     private String buildIdentityB64;
     private boolean signed;
-    private String ApBoardID;
-    private String ApChipID;
-    private String ApSecurityDomain;
+    private String apBoardID;
+    private String apChipID;
+    private String apSecurityDomain;
 
     private Asset asset;
 
@@ -36,29 +38,29 @@ public class BuildIdentity {
     }
 
     public String getApBoardID() {
-        return ApBoardID;
+        return apBoardID;
     }
 
     public BuildIdentity setApBoardID(String apBoardID) {
-        ApBoardID = apBoardID;
+        this.apBoardID = apBoardID;
         return this;
     }
 
     public String getApChipID() {
-        return ApChipID;
+        return apChipID;
     }
 
     public BuildIdentity setApChipID(String apChipID) {
-        ApChipID = apChipID;
+        this.apChipID = apChipID;
         return this;
     }
 
     public String getApSecurityDomain() {
-        return ApSecurityDomain;
+        return apSecurityDomain;
     }
 
     public BuildIdentity setApSecurityDomain(String apSecurityDomain) {
-        ApSecurityDomain = apSecurityDomain;
+        this.apSecurityDomain = apSecurityDomain;
         return this;
     }
 

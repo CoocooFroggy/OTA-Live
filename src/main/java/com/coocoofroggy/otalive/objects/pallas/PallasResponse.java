@@ -1,4 +1,4 @@
-package com.coocoofroggy.otalive.objects;
+package com.coocoofroggy.otalive.objects.pallas;
 
 import com.google.gson.annotations.SerializedName;
 

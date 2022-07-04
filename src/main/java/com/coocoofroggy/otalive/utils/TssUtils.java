@@ -1,15 +1,15 @@
 package com.coocoofroggy.otalive.utils;
 
 import com.coocoofroggy.otalive.Main;
-import com.coocoofroggy.otalive.objects.Asset;
 import com.coocoofroggy.otalive.objects.BuildIdentity;
 import com.coocoofroggy.otalive.objects.GlobalObject;
+import com.coocoofroggy.otalive.objects.SigningStatus;
+import com.coocoofroggy.otalive.objects.pallas.Asset;
 import com.dd.plist.*;
 import net.dv8tion.jda.api.EmbedBuilder;
 import net.dv8tion.jda.api.OnlineStatus;
 import net.dv8tion.jda.api.entities.Activity;
 import net.dv8tion.jda.api.entities.Guild;
-import net.dv8tion.jda.api.entities.Message;
 import net.dv8tion.jda.api.entities.TextChannel;
 import org.apache.commons.io.IOUtils;
 import org.apache.http.client.methods.CloseableHttpResponse;
@@ -65,7 +65,7 @@ public class TssUtils {
             </plist>
             """;
 
-    public static BuildIdentity dataFromBm(String boardId) throws PropertyListFormatException, IOException, ParseException, ParserConfigurationException, SAXException {
+    public static BuildIdentity buildIdentityFromBm(String boardId) throws PropertyListFormatException, IOException, ParseException, ParserConfigurationException, SAXException {
         File bm = new File("BuildManifest.plist");
         NSDictionary rootDict = (NSDictionary) PropertyListParser.parse(bm);
         NSObject[] buildIdentities = ((NSArray) rootDict.objectForKey("BuildIdentities")).getArray();
@@ -85,7 +85,7 @@ public class TssUtils {
         return null;
     }
 
-    public static boolean tssCheckSigned(BuildIdentity buildIdentity) throws IOException {
+    public static SigningStatus tssCheckSigned(BuildIdentity buildIdentity) throws IOException {
         String requestString = tssRequestTemplate.replaceFirst("\\{\\{UBID}}", buildIdentity.getBuildIdentityB64())
                 .replaceFirst("\\{\\{CPID}}", buildIdentity.getApChipID())
                 .replaceFirst("\\{\\{BDID}}", buildIdentity.getApBoardID())
@@ -102,14 +102,19 @@ public class TssUtils {
         response.close();
         client.close();
 
-        return !responseString.contains("STATUS=94&MESSAGE=This device isn't eligible for the requested build.");
+        if (responseString.contains("STATUS=94&MESSAGE=This device isn't eligible for the requested build."))
+            return SigningStatus.UNSIGNED;
+        else if (responseString.contains("STATUS=0&MESSAGE=SUCCESS"))
+            return SigningStatus.SIGNED;
+        else
+            return SigningStatus.UNKNOWN;
     }
 
     public static void downloadBmFromUrl(String url) throws IOException, InterruptedException {
         ProcessBuilder processBuilder = new ProcessBuilder("pzb", "-g", "AssetData/boot/BuildManifest.plist", url);
         Process process = processBuilder.start();
         BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()));
-        while (reader.readLine() != null) ;
+        while (reader.readLine() != null);
         process.waitFor();
     }
 
@@ -139,8 +144,8 @@ public class TssUtils {
                 Asset asset = buildIdentity.getAsset();
                 LOGGER.debug("Checking if " + asset.getBuildId() + " " + asset.getSupportedDevicesPretty() + " is unsigned...");
                 try {
-                    boolean signed = tssCheckSigned(buildIdentity);
-                    if (!signed) {
+                    SigningStatus signingStatus = tssCheckSigned(buildIdentity);
+                    if (signingStatus == SigningStatus.UNSIGNED) {
                         LOGGER.info("Marking " + asset.getBuildId() + " " + asset.getSupportedDevicesPretty() + " as unsigned.");
                         MongoUtils.markBuildIdentityAsUnsigned(buildIdentity);
                         somethingGotUnsigned = true;
@@ -150,7 +155,7 @@ public class TssUtils {
                         TextChannel channel = guild.getTextChannelById(globalObject.getChannelId());
 
                         EmbedBuilder embedBuilder = new EmbedBuilder();
-                        embedBuilder.setTitle("Unsigned: " + asset.getLongName() + " — " + asset.getSupportedDevicesPretty())
+                        embedBuilder.setTitle("Unsigned: " + asset.getHumanReadableName() + " — " + asset.getSupportedDevicesPretty())
                                 .setColor(new Color(0xB00000))
                                 .addField("Build ID", asset.getBuildId(), true)
                                 .addField("OS Version", asset.getOsVersion(), true)
@@ -184,6 +189,7 @@ public class TssUtils {
         return embedBuilder;
     }
 
+    // This one compares it to the initial one
     public static EmbedBuilder signedFirmwareEmbed(HashMap<String, Integer> initialBuildIdSignedDevicesCount) {
         HashMap<String, Integer> buildIdSignedDevicesCount = getBuildIdSignedDevicesCount();
 
@@ -216,8 +222,8 @@ public class TssUtils {
         HashMap<String, Integer> buildIdSignedDevicesCount = new HashMap<>();
         List<BuildIdentity> buildIdentities = MongoUtils.fetchAllSignedBuildIdentities();
         for (BuildIdentity buildIdentity : buildIdentities) {
-            // iOS 155Long (`18A24`)
-            String key = buildIdentity.getAsset().getLongName() + " (`" + buildIdentity.getAsset().getBuildId() + "`)";
+            // iOS 16 Developer Beta 2 (`18A24`)
+            String key = buildIdentity.getAsset().getHumanReadableName() + " (`" + buildIdentity.getAsset().getBuildId() + "`)";
             Integer count = buildIdSignedDevicesCount.get(key);
             if (count == null) count = 0;
             buildIdSignedDevicesCount.put(key, count + 1);

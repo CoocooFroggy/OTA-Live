@@ -23,7 +23,7 @@ import java.security.cert.CertificateFactory;
 import java.util.Objects;
 
 public class Main {
-    private static final Logger logger = LoggerFactory.getLogger(Main.class);
+    private static final Logger LOGGER = LoggerFactory.getLogger(Main.class);
     public static JDA jda;
 
     public static void main(String[] args) {
@@ -36,11 +36,11 @@ public class Main {
         MongoUtils.connectToDb();
         startBot();
         new Thread(Main::upsertAllCommands).start();
-        TimerUtils.runScannerEvery10Minutes();
+        TimerUtils.startLoopScheduler();
     }
 
     private static void upsertAllCommands() {
-        logger.info("Commands queued for updating.");
+        LOGGER.info("Commands queued for updating.");
         jda.upsertCommand("audience", "Manage asset audiences")
                 .addSubcommands(
                         new SubcommandData("add", "Add an asset audience")
@@ -54,7 +54,7 @@ public class Main {
                         new SubcommandData("force-run", "Force runs the scanner"),
                         new SubcommandData("signing-status", "Sends the embed with signing status"))
                 .complete();
-        logger.info("Commands updated.");
+        LOGGER.info("Commands updated.");
     }
 
     private static void startBot() {
