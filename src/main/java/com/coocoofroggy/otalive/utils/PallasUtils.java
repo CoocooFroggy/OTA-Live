@@ -132,10 +132,11 @@ public class PallasUtils {
                                 MongoUtils.replaceGlobalObject(globalObject);
 
                                 // Add info to DB that will allow us to check if it's signed
-                                TssUtils.downloadBmFromUrl(asset.getFullUrl());
-                                BuildIdentity buildIdentity = TssUtils.buildIdentityFromBm(boardId);
+                                File bm = TssUtils.downloadBmFromUrl(asset.getFullUrl());
+                                BuildIdentity buildIdentity = TssUtils.buildIdentityFromBm(bm, boardId);
                                 // Should never trigger. But just in case
                                 if (buildIdentity == null) {
+                                    LOGGER.error("BM for " + device + " (" + buildIdentity + ") is null. Skipping this asset—not adding it to Build Identities collection.");
                                     channel.sendMessage("<@353561670934855681> couldn't parse data from BM 🚨.").queue();
                                     continue;
                                 }

@@ -65,8 +65,7 @@ public class TssUtils {
             </plist>
             """;
 
-    public static BuildIdentity buildIdentityFromBm(String boardId) throws PropertyListFormatException, IOException, ParseException, ParserConfigurationException, SAXException {
-        File bm = new File("BuildManifest.plist");
+    public static BuildIdentity buildIdentityFromBm(File bm, String boardId) throws PropertyListFormatException, IOException, ParseException, ParserConfigurationException, SAXException {
         NSDictionary rootDict = (NSDictionary) PropertyListParser.parse(bm);
         NSObject[] buildIdentities = ((NSArray) rootDict.objectForKey("BuildIdentities")).getArray();
         // Loop through all the identities in BM
@@ -110,12 +109,13 @@ public class TssUtils {
             return SigningStatus.UNKNOWN;
     }
 
-    public static void downloadBmFromUrl(String url) throws IOException, InterruptedException {
+    public static File downloadBmFromUrl(String url) throws IOException, InterruptedException {
         ProcessBuilder processBuilder = new ProcessBuilder("pzb", "-g", "AssetData/boot/BuildManifest.plist", url);
         Process process = processBuilder.start();
         BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()));
         while (reader.readLine() != null) ;
         process.waitFor();
+        return new File("BuildManifest.plist");
     }
 
     public static boolean runTssScanner(GlobalObject globalObject) {
