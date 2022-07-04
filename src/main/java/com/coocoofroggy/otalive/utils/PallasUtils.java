@@ -9,6 +9,7 @@ import com.dd.plist.NSDictionary;
 import com.dd.plist.PropertyListFormatException;
 import com.dd.plist.PropertyListParser;
 import com.google.gson.Gson;
+import com.google.gson.JsonSyntaxException;
 import net.dv8tion.jda.api.EmbedBuilder;
 import net.dv8tion.jda.api.OnlineStatus;
 import net.dv8tion.jda.api.entities.Activity;
@@ -23,6 +24,7 @@ import org.apache.http.client.methods.HttpPost;
 import org.apache.http.entity.StringEntity;
 import org.apache.http.impl.client.CloseableHttpClient;
 import org.apache.http.impl.client.HttpClients;
+import org.jetbrains.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.xml.sax.SAXException;
@@ -73,26 +75,10 @@ public class PallasUtils {
                     String boardId = split[1];
                     String deviceHumanName = split[2];
 
-                    audienceLoopLabel:
                     for (String assetAudience : globalObject.getAssetAudiences()) {
-                        PallasResponse suPallasResponse;
-                        int suAttempts = 0;
-                        while (true) {
-                            // Get SU from GDMF
-                            String suResponseString = suRequest(device, boardId, assetAudience);
-                            suPallasResponse = parseJwt(suResponseString);
-                            // If there are no assets, retry
-                            if (suPallasResponse == null || suPallasResponse.getAssets().isEmpty()) {
-                                suAttempts++;
-                                // If we hit max attempts, just go on to next asset audience for this device
-                                if (suAttempts >= 3) {
-                                    continue audienceLoopLabel;
-                                }
-                                continue;
-                            }
-                            // Otherwise break out of loop: we have the assets
-                            break;
-                        }
+
+                        PallasResponse suPallasResponse = fetchSuPallasResponse(device, boardId, assetAudience);
+                        if (suPallasResponse == null) continue; // Skip this asset audience for device if null
 
                         assetLoopLabel:
                         for (Asset asset : suPallasResponse.getAssets()) {
@@ -112,24 +98,8 @@ public class PallasUtils {
                                     continue;
                                 }
 
-                                PallasResponse docPallasResponse;
-                                int docAttempts = 0;
-                                while (true) {
-                                    // Get Documentation from GDMF
-                                    String docResponseString = docRequest(assetAudience, asset.getSuDocumentationId(), matcher.group(1));
-                                    docPallasResponse = parseJwt(docResponseString);
-                                    // If there are no assets, retry
-                                    if (docPallasResponse == null || docPallasResponse.getAssets().isEmpty()) {
-                                        docAttempts++;
-                                        // If we hit max attempts, just go on to next asset
-                                        if (docAttempts >= 3) {
-                                            continue assetLoopLabel;
-                                        }
-                                        continue;
-                                    }
-                                    // Otherwise break out of loop: we have the asset
-                                    break;
-                                }
+                                PallasResponse docPallasResponse = fetchDocPallasResponse(device, assetAudience, asset, matcher);
+                                if (docPallasResponse == null) continue assetLoopLabel;
 
                                 // Not iterating through assets because there should not be multiple documentations. Just use the first.
                                 // Get human-readable name
@@ -197,6 +167,64 @@ public class PallasUtils {
         }
     }
 
+    @Nullable
+    private static PallasResponse fetchDocPallasResponse(String device, String assetAudience, Asset asset, Matcher matcher) throws IOException {
+        PallasResponse docPallasResponse;
+        int docAttempts = 0;
+        while (true) {
+            // Get Documentation from GDMF
+            String docResponseString = docRequest(assetAudience, asset.getSuDocumentationId(), matcher.group(1));
+            docPallasResponse = parseJwt(docResponseString);
+            // If there are no assets, retry
+            if (docPallasResponse == null || docPallasResponse.getAssets().isEmpty()) {
+                docAttempts++;
+                // If we hit max attempts, just go on to next asset
+                if (docAttempts >= 3) {
+                    LOGGER.error("Skipping asset for " + device + " because documentation (" + asset.getSuDocumentationId() + ") is null or empty.");
+                    return null;
+                }
+                continue;
+            }
+            // Otherwise break out of loop: we have the asset
+            break;
+        }
+        return docPallasResponse;
+    }
+
+    @Nullable
+    private static PallasResponse fetchSuPallasResponse(String device, String boardId, String assetAudience) throws IOException {
+        PallasResponse suPallasResponse;
+        int suAttempts = 0;
+        while (true) {
+            // Get SU from GDMF
+            String suResponseString = suRequest(device, boardId, assetAudience);
+            try {
+                suPallasResponse = parseJwt(suResponseString);
+            } catch (JsonSyntaxException e) {
+                suAttempts++;
+                // If we hit max attempts, just go on to next asset audience for this device
+                if (suAttempts >= 3) {
+                    LOGGER.error("Skipping asset audience (" + assetAudience + ") for " + device + ":", e);
+                    return null;
+                }
+                continue;
+            }
+            // If the response gives us null, retry
+            if (suPallasResponse == null) {
+                suAttempts++;
+                // If we hit max attempts, just go on to next asset audience for this device
+                if (suAttempts >= 3) {
+                    LOGGER.error("Skipping asset audience (" + assetAudience + ") for " + device + " because JSON deserialization was null.");
+                    return null;
+                }
+                continue;
+            }
+            // Otherwise break out of loop: we have the assets
+            break;
+        }
+        return suPallasResponse;
+    }
+
     public static String suRequest(String device, String boardId, String assetAudience) throws IOException {
         Map<String, Object> requestMap = Map.of(
                 "ClientVersion", 2,
@@ -249,7 +277,7 @@ public class PallasUtils {
         return responseString;
     }
 
-    public static PallasResponse parseJwt(String encodedString) {
+    public static PallasResponse parseJwt(String encodedString) throws JsonSyntaxException {
         // The part between the two dots is what we need
         String meat = encodedString.split("\\.")[1];
         String decoded = new String(Base64.decodeBase64(meat), StandardCharsets.UTF_8);
