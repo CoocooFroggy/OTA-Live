@@ -1,11 +1,13 @@
 package com.coocoofroggy.otalive.utils;
 
 import com.coocoofroggy.otalive.Main;
-import com.coocoofroggy.otalive.objects.pallas.Asset;
 import com.coocoofroggy.otalive.objects.BuildIdentity;
 import com.coocoofroggy.otalive.objects.GlobalObject;
+import com.coocoofroggy.otalive.objects.pallas.Asset;
 import com.coocoofroggy.otalive.objects.pallas.PallasResponse;
-import com.dd.plist.*;
+import com.dd.plist.NSDictionary;
+import com.dd.plist.PropertyListFormatException;
+import com.dd.plist.PropertyListParser;
 import com.google.gson.Gson;
 import net.dv8tion.jda.api.EmbedBuilder;
 import net.dv8tion.jda.api.OnlineStatus;
@@ -40,6 +42,7 @@ import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 public class PallasUtils {
+    public static final Pattern DEVICE_NAME_PATTERN = Pattern.compile("(.*?)\\d.*");
     private static final Gson gson = new Gson();
     private static final Logger LOGGER = LoggerFactory.getLogger(PallasUtils.class);
     private static final Pattern PZB_FILE_PATTERN = Pattern.compile(" f (.*)");
@@ -49,7 +52,6 @@ public class PallasUtils {
     private static final String[] SPECIAL_CASE = new String[]{
             "DeviceTree", "iBoot", "LLB", "sep-firmware", "iBEC", "iBSS", "diag"
     };
-    public static final Pattern DEVICE_NAME_PATTERN = Pattern.compile("(.*?)\\d.*");
 
     public static boolean runGdmfScanner(GlobalObject globalObject) {
         boolean newFirmwareReleased = false;
@@ -298,7 +300,7 @@ public class PallasUtils {
         ProcessBuilder processBuilder = new ProcessBuilder("pzb", "-g", "AssetData/en.lproj/documentation.strings", url);
         Process process = processBuilder.start();
         BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()));
-        while (reader.readLine() != null);
+        while (reader.readLine() != null) ;
         process.waitFor();
         return new File("documentation.strings");
     }

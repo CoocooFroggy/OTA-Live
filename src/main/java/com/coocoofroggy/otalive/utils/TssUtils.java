@@ -114,7 +114,7 @@ public class TssUtils {
         ProcessBuilder processBuilder = new ProcessBuilder("pzb", "-g", "AssetData/boot/BuildManifest.plist", url);
         Process process = processBuilder.start();
         BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()));
-        while (reader.readLine() != null);
+        while (reader.readLine() != null) ;
         process.waitFor();
     }
 
@@ -198,7 +198,7 @@ public class TssUtils {
             // If there is a new firmware added
             if (!initialBuildIdSignedDevicesCount.containsKey(entry.getKey()))
                 stringBuilder.append("NEW → ");
-            // If it's not a new firmware, but the values are different
+                // If it's not a new firmware, but the values are different
             else if (!initialBuildIdSignedDevicesCount.get(entry.getKey()).equals(entry.getValue()))
                 stringBuilder.append("CHANGED → ");
             stringBuilder.append(entry.getKey()).append(": ").append(entry.getValue()).append(" devices.\n");

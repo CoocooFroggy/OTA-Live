@@ -10,6 +10,7 @@ import org.slf4j.LoggerFactory;
 import java.util.HashMap;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 
 public class TimerUtils {
     private static final Logger LOGGER = LoggerFactory.getLogger(TimerUtils.class);
@@ -18,8 +19,7 @@ public class TimerUtils {
 
     public static void startLoopScheduler() {
         final Runnable scanner = TimerUtils::scanLoop;
-        // DEBUG
-//        scheduler.scheduleAtFixedRate(scanner, 0, 1, TimeUnit.MINUTES);
+        scheduler.scheduleAtFixedRate(scanner, 0, 1, TimeUnit.MINUTES);
     }
 
     public static void scanLoop() {

@@ -1,13 +1,9 @@
 package com.coocoofroggy.otalive.listeners;
 
-import com.coocoofroggy.otalive.Main;
 import com.coocoofroggy.otalive.objects.GlobalObject;
 import com.coocoofroggy.otalive.utils.MongoUtils;
-import com.coocoofroggy.otalive.utils.PallasUtils;
 import com.coocoofroggy.otalive.utils.TimerUtils;
 import com.coocoofroggy.otalive.utils.TssUtils;
-import net.dv8tion.jda.api.entities.Guild;
-import net.dv8tion.jda.api.entities.TextChannel;
 import net.dv8tion.jda.api.events.interaction.command.SlashCommandInteractionEvent;
 import net.dv8tion.jda.api.hooks.ListenerAdapter;
 import org.jetbrains.annotations.NotNull;
