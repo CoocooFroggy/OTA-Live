@@ -46,6 +46,12 @@ public class MongoUtils {
                 new ReplaceOptions().upsert(true));
     }
 
+    public static UpdateResult pushToProcessedBuildIdDeviceCombo(GlobalObject globalObject, String combo) {
+        return getGlobalPersistenceCollection().updateOne(
+                Filters.eq(globalObject.getId()),
+                Updates.push("processedBuildIdDeviceCombo", combo));
+    }
+
     // endregion
 
     // region Build Identities

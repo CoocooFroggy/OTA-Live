@@ -128,18 +128,19 @@ public class PallasUtils {
                                 // Update the message
                                 message.editMessageEmbeds(embedBuilder.build()).queue();
 
-                                globalObject.getProcessedBuildIdDeviceCombo().add(asset.uniqueComboString());
-                                MongoUtils.replaceGlobalObject(globalObject);
-
-                                // Add info to DB that will allow us to check if it's signed
+                                // Get BuildIdentity data for TSS
                                 File bm = TssUtils.downloadBmFromUrl(asset.getFullUrl());
                                 BuildIdentity buildIdentity = TssUtils.buildIdentityFromBm(bm, boardId);
                                 // Should never trigger. But just in case
                                 if (buildIdentity == null) {
                                     LOGGER.error("BM for " + device + " (" + buildIdentity + ") is null. Skipping this asset—not adding it to Build Identities collection.");
                                     channel.sendMessage("<@353561670934855681> couldn't parse data from BM 🚨.").queue();
+                                    message.editMessage("Failed to parse BuildManifest—you may see the embed below duplicated at a later point in time.").queue();
                                     continue;
                                 }
+                                // Mark this combo as processed in DB
+                                MongoUtils.pushToProcessedBuildIdDeviceCombo(globalObject, asset.uniqueComboString());
+                                // Add to TSS queue
                                 buildIdentity.setAsset(asset);
                                 MongoUtils.insertBuildIdentity(buildIdentity);
                             } else {
