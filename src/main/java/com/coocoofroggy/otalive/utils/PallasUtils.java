@@ -138,6 +138,8 @@ public class PallasUtils {
                                     message.editMessage("Failed to parse BuildManifest—you may see the embed below duplicated at a later point in time.").queue();
                                     continue;
                                 }
+                                // Mark this combo as processed in memory
+                                processedBuildIdDeviceCombos.add(asset.uniqueComboString());
                                 // Mark this combo as processed in DB
                                 MongoUtils.pushToProcessedBuildIdDeviceCombo(globalObject, asset.uniqueComboString());
                                 // Add to TSS queue
