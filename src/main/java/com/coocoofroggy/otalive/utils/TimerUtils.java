@@ -34,6 +34,7 @@ public class TimerUtils {
                 // Keep running the scanners until everything settles
                 do {
                     LOGGER.info("Running scanners again until everything settles.");
+                    globalObject = MongoUtils.fetchGlobalObject();
                 } while (PallasUtils.runGdmfScanner(globalObject) || TssUtils.runTssScanner(globalObject));
 
                 // Once everything is settled, send the embed with changes
