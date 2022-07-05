@@ -197,17 +197,17 @@ public class TssUtils {
         for (Map.Entry<String, Integer> entry : buildIdSignedDevicesCount.entrySet()) {
             // If there is a new firmware added
             if (!initialBuildIdSignedDevicesCount.containsKey(entry.getKey()))
-                stringBuilder.append("NEW → ");
+                stringBuilder.append("**NEW →** ");
                 // If it's not a new firmware, but the values are different
             else if (!initialBuildIdSignedDevicesCount.get(entry.getKey()).equals(entry.getValue()))
-                stringBuilder.append("CHANGED → ");
+                stringBuilder.append("**CHANGED →** ");
             stringBuilder.append(entry.getKey()).append(": ").append(entry.getValue()).append(" devices.\n");
         }
         // Check if anything was unsigned, and say so
         for (Map.Entry<String, Integer> entry : initialBuildIdSignedDevicesCount.entrySet()) {
             // If the current buildIdSignedDevicesCount doesn't have a key that was there initially, it got unsigned
             if (!buildIdSignedDevicesCount.containsKey(entry.getKey()))
-                stringBuilder.append("UNSIGNED → ").append(entry.getKey()).append(": ").append(entry.getValue()).append(" devices.\n");
+                stringBuilder.append("**UNSIGNED →** ").append(entry.getKey()).append(": ").append(entry.getValue()).append(" devices.\n");
         }
 
         EmbedBuilder embedBuilder = new EmbedBuilder();
