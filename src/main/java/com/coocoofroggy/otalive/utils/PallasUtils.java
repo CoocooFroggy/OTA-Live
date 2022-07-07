@@ -41,7 +41,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.Executors;
-import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.regex.Matcher;
@@ -61,8 +60,7 @@ public class PallasUtils {
     };
     private static final DecimalFormat DECIMAL_FORMAT = new DecimalFormat("0.0");
 
-    private static final ScheduledExecutorService PRESENCE_SCHEDULER =
-            Executors.newScheduledThreadPool(1);
+    private static ScheduledExecutorService presenceScheduler;
     private static double scanProgressPercent = 0.0;
 
     public static boolean runGdmfScanner(GlobalObject globalObject) {
@@ -71,15 +69,12 @@ public class PallasUtils {
         int attempts = 0;
         int maxAttempts = 3;
 
-        // Every 2 seconds, update this
-        try {
-            PRESENCE_SCHEDULER.scheduleAtFixedRate(() -> {
-                Main.jda.getPresence().setPresence(OnlineStatus.ONLINE,
-                        Activity.playing(DECIMAL_FORMAT.format(scanProgressPercent) + "% scanning..."));
-            }, 0, 5, TimeUnit.SECONDS);
-        } catch (RejectedExecutionException e) {
-            LOGGER.debug("Rejected execution of presence for GDMF. This is normal on completion.");
-        }
+        // Update presence every so often
+        presenceScheduler = Executors.newScheduledThreadPool(1);
+        presenceScheduler.scheduleAtFixedRate(() -> {
+            Main.jda.getPresence().setPresence(OnlineStatus.ONLINE,
+                    Activity.playing(DECIMAL_FORMAT.format(scanProgressPercent) + "% scanning..."));
+        }, 0, 5, TimeUnit.SECONDS);
 
         while (true) {
             LOGGER.debug("Starting scanner...");
@@ -196,10 +191,11 @@ public class PallasUtils {
     }
 
     static void shutdownPresenceMonitor() {
-        PRESENCE_SCHEDULER.shutdown();
+        presenceScheduler.shutdown();
+        scanProgressPercent = 0;
         try {
             // TODO: Ignore this somehow
-            PRESENCE_SCHEDULER.awaitTermination(3, TimeUnit.SECONDS);
+            presenceScheduler.awaitTermination(3, TimeUnit.SECONDS);
         } catch (InterruptedException e) {
             LOGGER.error("Interrupted shutting down presence monitor, but we don't care.");
         }

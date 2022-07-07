@@ -31,13 +31,11 @@ import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
 import java.text.DecimalFormat;
 import java.text.ParseException;
-import java.time.Instant;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.Executors;
-import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 
@@ -74,8 +72,7 @@ public class TssUtils {
             """;
     private static final DecimalFormat DECIMAL_FORMAT = new DecimalFormat("0.0");
 
-    private static final ScheduledExecutorService PRESENCE_SCHEDULER =
-            Executors.newScheduledThreadPool(1);
+    private static ScheduledExecutorService presenceScheduler;
     private static double tssProgressPercent = 0.0;
 
     public static BuildIdentity buildIdentityFromBm(File bm, String boardId) throws PropertyListFormatException, IOException, ParseException, ParserConfigurationException, SAXException {
@@ -137,15 +134,12 @@ public class TssUtils {
         int attempts = 0;
         int maxAttempts = 3;
 
-        // Every 2 seconds, update this
-        try {
-            PRESENCE_SCHEDULER.scheduleAtFixedRate(() -> {
-                Main.jda.getPresence().setPresence(OnlineStatus.ONLINE,
-                        Activity.playing(DECIMAL_FORMAT.format(tssProgressPercent) + "% checking TSS..."));
-            }, 0, 5, TimeUnit.SECONDS);
-        } catch (RejectedExecutionException e) {
-            LOGGER.debug("Rejected execution of presence for TSS. This is normal on completion.");
-        }
+        // Update presence every so often
+        presenceScheduler = Executors.newScheduledThreadPool(1);
+        presenceScheduler.scheduleAtFixedRate(() -> {
+            Main.jda.getPresence().setPresence(OnlineStatus.ONLINE,
+                    Activity.playing(DECIMAL_FORMAT.format(tssProgressPercent) + "% checking TSS..."));
+        }, 0, 5, TimeUnit.SECONDS);
 
         while (true) {
             LOGGER.debug("Starting TSS scanner...");
@@ -204,10 +198,11 @@ public class TssUtils {
     }
 
     static void shutdownPresenceMonitor() {
-        PRESENCE_SCHEDULER.shutdown();
+        presenceScheduler.shutdown();
+        tssProgressPercent = 0;
         try {
             // TODO: Ignore this somehow
-            PRESENCE_SCHEDULER.awaitTermination(3, TimeUnit.SECONDS);
+            presenceScheduler.awaitTermination(3, TimeUnit.SECONDS);
         } catch (InterruptedException e) {
             LOGGER.error("Interrupted shutting down presence monitor, but we don't care.");
         }
