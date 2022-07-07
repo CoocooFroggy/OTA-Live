@@ -46,7 +46,7 @@ public class DiscordListener extends ListenerAdapter {
                             event.reply("None added yet.").queue();
                             return;
                         }
-                        String collect = assetAudiences.stream().collect(Collectors.joining("`, `", "`", "`"));
+                        String collect = assetAudiences.stream().collect(Collectors.joining("`\n`", "`", "`"));
                         event.reply(collect).queue();
                     }
                 }

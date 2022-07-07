@@ -7,24 +7,24 @@ import net.dv8tion.jda.api.entities.TextChannel;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 
 public class TimerUtils {
     private static final Logger LOGGER = LoggerFactory.getLogger(TimerUtils.class);
-    private static final ScheduledExecutorService scheduler =
+    private static final ScheduledExecutorService SCHEDULER =
             Executors.newScheduledThreadPool(1);
 
     public static void startLoopScheduler() {
         final Runnable scanner = TimerUtils::scanLoop;
-        scheduler.scheduleAtFixedRate(scanner, 0, 1, TimeUnit.MINUTES);
+        SCHEDULER.scheduleAtFixedRate(scanner, 0, 1, TimeUnit.MINUTES);
     }
 
     public static void scanLoop() {
         try {
-            HashMap<String, Integer> initialBuildIdSignedDevicesCount = TssUtils.getBuildIdSignedDevicesCount();
+            LinkedHashMap<String, Integer> initialTitleToDeviceCount = TssUtils.fetchTitleToDeviceCount();
 
             GlobalObject globalObject = MongoUtils.fetchGlobalObject();
             boolean gdmfScanResult = PallasUtils.runGdmfScanner(globalObject);
@@ -34,16 +34,17 @@ public class TimerUtils {
                 // Keep running the scanners until everything settles
                 do {
                     LOGGER.info("Running scanners again until everything settles.");
-                    globalObject = MongoUtils.fetchGlobalObject();
                 } while (PallasUtils.runGdmfScanner(globalObject) || TssUtils.runTssScanner(globalObject));
 
                 // Once everything is settled, send the embed with changes
                 Guild guild = Main.jda.getGuildById(globalObject.getGuildId());
                 TextChannel channel = guild.getTextChannelById(globalObject.getChannelId());
-                channel.sendMessageEmbeds(TssUtils.signedFirmwareEmbed(initialBuildIdSignedDevicesCount).build()).queue();
+                channel.sendMessageEmbeds(TssUtils.signedFirmwareEmbed(initialTitleToDeviceCount).build()).queue();
             }
         } catch (Exception e) {
             LOGGER.error("Caught an exception. Finishing loop.", e);
+            PallasUtils.shutdownPresenceMonitor();
+            TssUtils.shutdownPresenceMonitor();
         }
     }
 }

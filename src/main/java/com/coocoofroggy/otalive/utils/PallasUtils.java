@@ -35,10 +35,15 @@ import java.io.File;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
+import java.text.DecimalFormat;
 import java.text.ParseException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.Executors;
+import java.util.concurrent.RejectedExecutionException;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
@@ -54,6 +59,11 @@ public class PallasUtils {
     private static final String[] SPECIAL_CASE = new String[]{
             "DeviceTree", "iBoot", "LLB", "sep-firmware", "iBEC", "iBSS", "diag"
     };
+    private static final DecimalFormat DECIMAL_FORMAT = new DecimalFormat("0.0");
+
+    private static final ScheduledExecutorService PRESENCE_SCHEDULER =
+            Executors.newScheduledThreadPool(1);
+    private static double scanProgressPercent = 0.0;
 
     public static boolean runGdmfScanner(GlobalObject globalObject) {
         boolean newFirmwareReleased = false;
@@ -61,31 +71,44 @@ public class PallasUtils {
         int attempts = 0;
         int maxAttempts = 3;
 
+        // Every 2 seconds, update this
+        try {
+            PRESENCE_SCHEDULER.scheduleAtFixedRate(() -> {
+                Main.jda.getPresence().setPresence(OnlineStatus.ONLINE,
+                        Activity.playing(DECIMAL_FORMAT.format(scanProgressPercent) + "% scanning..."));
+            }, 0, 5, TimeUnit.SECONDS);
+        } catch (RejectedExecutionException e) {
+            LOGGER.debug("Rejected execution of presence for GDMF. This is normal on completion.");
+        }
+
         while (true) {
             LOGGER.debug("Starting scanner...");
-            Main.jda.getPresence().setPresence(OnlineStatus.ONLINE, Activity.playing("scanning..."));
             try {
-                List<String> lines = FileUtils.readLines(new File("devices.txt"), StandardCharsets.UTF_8);
+                // Processed assets to skip
+                List<Asset> processedAssets = MongoUtils.fetchAllProcessedAssets();
 
+                List<String> lines = FileUtils.readLines(new File("devices.txt"), StandardCharsets.UTF_8);
                 // Loop through all devices
-                for (String line : lines) {
+                for (int i = 0; i < lines.size(); i++) {
+                    String line = lines.get(i);
                     if (line.isBlank() || line.startsWith("//")) continue;
                     String[] split = line.split(";");
                     String device = split[0];
                     String boardId = split[1];
                     String deviceHumanName = split[2];
 
-                    for (String assetAudience : globalObject.getAssetAudiences()) {
+                    // Update progress bar
+                    scanProgressPercent = ((double) i / lines.size()) * 100;
 
+                    for (String assetAudience : globalObject.getAssetAudiences()) {
                         PallasResponse suPallasResponse = fetchSuPallasResponse(device, boardId, assetAudience);
                         if (suPallasResponse == null) continue; // Skip this asset audience for device if null
 
                         assetLoopLabel:
                         for (Asset asset : suPallasResponse.getAssets()) {
-                            List<String> processedBuildIdDeviceCombos = globalObject.getProcessedBuildIdDeviceCombo();
-                            // If this is a new build ID & device combo, process it
-                            if (!processedBuildIdDeviceCombos.contains(asset.uniqueComboString())) {
-                                LOGGER.info("NEW: " + asset.getBuildId() + " " + asset.getSupportedDevicesPretty());
+                            // If this is a new asset, process it
+                            if (!processedAssets.contains(asset)) {
+                                LOGGER.info("NEW: " + asset.getSupportedDevicesPretty() + " " + asset.getSuDocumentationId() + " (" + asset.getBuildId() + ")");
                                 newFirmwareReleased = true;
                                 Guild guild = Main.jda.getGuildById(globalObject.getGuildId());
                                 TextChannel channel = guild.getTextChannelById(globalObject.getChannelId());
@@ -138,20 +161,21 @@ public class PallasUtils {
                                     message.editMessage("Failed to parse BuildManifest—you may see the embed below duplicated at a later point in time.").queue();
                                     continue;
                                 }
-                                // Mark this combo as processed in memory
-                                processedBuildIdDeviceCombos.add(asset.uniqueComboString());
-                                // Mark this combo as processed in DB
-                                MongoUtils.pushToProcessedBuildIdDeviceCombo(globalObject, asset.uniqueComboString());
-                                // Add to TSS queue
+                                // Mark this asset as processed in memory
+                                processedAssets.add(asset);
+                                // Mark this asset as processed in DB and add to TSS queue
                                 buildIdentity.setAsset(asset);
                                 MongoUtils.insertBuildIdentity(buildIdentity);
                             } else {
-                                LOGGER.debug("Old: " + asset.getBuildId() + " " + asset.getSupportedDevicesPretty());
+                                LOGGER.debug("Old: " + asset.getSupportedDevicesPretty() + " " + asset.getSuDocumentationId() + " (" + asset.getBuildId() + ")");
                             }
                         }
                     }
                 }
+
+                shutdownPresenceMonitor();
                 Main.jda.getPresence().setPresence(OnlineStatus.IDLE, null);
+
                 LOGGER.debug("Scanner finished.");
                 return newFirmwareReleased; // Otherwise we'd be stuck in infinite while true loop
             } catch (InterruptedException e) {
@@ -168,6 +192,16 @@ public class PallasUtils {
                 LOGGER.error("Scanner terminated early.");
                 throw new RuntimeException(e);
             }
+        }
+    }
+
+    static void shutdownPresenceMonitor() {
+        PRESENCE_SCHEDULER.shutdown();
+        try {
+            // TODO: Ignore this somehow
+            PRESENCE_SCHEDULER.awaitTermination(3, TimeUnit.SECONDS);
+        } catch (InterruptedException e) {
+            LOGGER.error("Interrupted shutting down presence monitor, but we don't care.");
         }
     }
 

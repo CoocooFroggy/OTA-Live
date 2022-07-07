@@ -3,6 +3,7 @@ package com.coocoofroggy.otalive.objects.pallas;
 import com.google.gson.annotations.SerializedName;
 
 import java.util.List;
+import java.util.Objects;
 
 public class Asset {
     @SerializedName("OSVersion")
@@ -23,6 +24,29 @@ public class Asset {
     private String humanReadableName;
 
     public Asset() {
+    }
+
+    // https://www.sitepoint.com/implement-javas-equals-method-correctly/
+    @Override
+    public boolean equals(Object obj) {
+        // self check
+        if (this == obj)
+            return true;
+        // null check
+        if (obj == null)
+            return false;
+        // type check and cast
+        if (getClass() != obj.getClass())
+            return false;
+        Asset asset = (Asset) obj;
+        // field comparison
+        return Objects.equals(osVersion, asset.osVersion)
+                && Objects.equals(baseUrl, asset.baseUrl)
+                && Objects.equals(relativePath, asset.relativePath)
+                && Objects.equals(buildId, asset.buildId)
+                && Objects.equals(suDocumentationId, asset.suDocumentationId)
+                && Objects.equals(supportedDevices, asset.supportedDevices);
+        // We don't check humanReadableName because one of the assets may not have fetched it yet
     }
 
     public String getOsVersion() {
@@ -85,10 +109,6 @@ public class Asset {
 
     public String getSupportedDevicesPretty() {
         return String.join(", ", supportedDevices);
-    }
-
-    public String uniqueComboString() {
-        return getBuildId() + ";" + getSupportedDevicesPretty();
     }
 
     public String getHumanReadableName() {

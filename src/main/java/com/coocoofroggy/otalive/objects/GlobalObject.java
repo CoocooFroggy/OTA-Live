@@ -10,7 +10,6 @@ public class GlobalObject {
     @BsonId
     private ObjectId id;
     private List<String> assetAudiences;
-    private List<String> processedBuildIdDeviceCombo;
 
     private String guildId;
     private String channelId;
@@ -35,17 +34,6 @@ public class GlobalObject {
 
     public GlobalObject setAssetAudiences(List<String> assetAudiences) {
         this.assetAudiences = assetAudiences;
-        return this;
-    }
-
-    public List<String> getProcessedBuildIdDeviceCombo() {
-        if (processedBuildIdDeviceCombo == null)
-            processedBuildIdDeviceCombo = new ArrayList<>();
-        return processedBuildIdDeviceCombo;
-    }
-
-    public GlobalObject setProcessedBuildIdDeviceCombo(List<String> processedBuildIdDeviceCombo) {
-        this.processedBuildIdDeviceCombo = processedBuildIdDeviceCombo;
         return this;
     }
 

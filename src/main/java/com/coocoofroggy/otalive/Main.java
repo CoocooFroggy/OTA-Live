@@ -5,6 +5,7 @@ import com.coocoofroggy.otalive.utils.MongoUtils;
 import com.coocoofroggy.otalive.utils.TimerUtils;
 import net.dv8tion.jda.api.JDA;
 import net.dv8tion.jda.api.JDABuilder;
+import net.dv8tion.jda.api.OnlineStatus;
 import net.dv8tion.jda.api.interactions.commands.OptionType;
 import net.dv8tion.jda.api.interactions.commands.build.SubcommandData;
 import org.slf4j.Logger;
@@ -63,6 +64,8 @@ public class Main {
         try {
             jda = builder.build();
             jda.awaitReady();
+            // Default idle 🌙
+            jda.getPresence().setPresence(OnlineStatus.IDLE, null);
         } catch (LoginException | InterruptedException e) {
             throw new RuntimeException(e);
         }
