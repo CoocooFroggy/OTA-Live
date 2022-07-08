@@ -60,9 +60,7 @@ public class DiscordListener extends ListenerAdapter {
                         event.reply("Running").setEphemeral(true).queue();
                         TimerUtils.scanLoop();
                     }
-                    case "signing-status" -> {
-                        event.replyEmbeds(TssUtils.signedFirmwareEmbed().build()).queue();
-                    }
+                    case "signing-status" -> event.replyEmbeds(TssUtils.signedFirmwareEmbed().build()).queue();
                 }
             }
         }

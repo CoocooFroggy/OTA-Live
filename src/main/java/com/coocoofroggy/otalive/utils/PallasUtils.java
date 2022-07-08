@@ -214,8 +214,7 @@ public class PallasUtils {
                         }
                     }
                     break;
-                } catch (IOException | InterruptedException | PropertyListFormatException |
-                         ParseException | ParserConfigurationException | SAXException e) {
+                } catch (Exception e) {
                     // Try again (because of while true loop) but on third try, just quit
                     if (++attempts > maxAttempts) {
                         Main.jda.getPresence().setPresence(OnlineStatus.IDLE, null);
@@ -359,7 +358,7 @@ public class PallasUtils {
         return gson.fromJson(decoded, PallasResponse.class);
     }
 
-    private static List<String> listDevFiles(String urlString, String boardId) throws IOException, InterruptedException {
+    private static List<String> listDevFiles(String urlString, String boardId) throws IOException {
         URL url = new URL(urlString);
         ZipFile otaZip = new ZipFile(new HttpChannel(url), "Dev Files: " + urlString, StandardCharsets.UTF_8.name(), true, true);
 
@@ -394,7 +393,7 @@ public class PallasUtils {
         return devFiles;
     }
 
-    public static String humanReadableFromDocUrl(String urlString) throws IOException, InterruptedException, PropertyListFormatException, ParseException, ParserConfigurationException, SAXException {
+    public static String humanReadableFromDocUrl(String urlString) throws Exception {
         InputStream documentationStringsInputStream = documentationStringsInputStreamFromUrl(urlString);
 
         NSDictionary rootDict = (NSDictionary) PropertyListParser.parse(documentationStringsInputStream);

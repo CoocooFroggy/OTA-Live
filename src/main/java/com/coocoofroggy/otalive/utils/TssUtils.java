@@ -101,7 +101,7 @@ public class TssUtils {
             return SigningStatus.UNKNOWN;
     }
 
-    public static BuildIdentity buildIdentityFromUrl(String urlString, String boardId) throws IOException, InterruptedException, PropertyListFormatException, ParseException, ParserConfigurationException, SAXException {
+    public static BuildIdentity buildIdentityFromUrl(String urlString, String boardId) throws Exception {
         InputStream buildManifestInputStream = buildManifestInputStreamFromUrl(urlString);
 
         NSDictionary rootDict = (NSDictionary) PropertyListParser.parse(buildManifestInputStream);
