@@ -114,11 +114,11 @@ public class PallasUtils {
             // Add it to a list to check if they're all completed
             completableFutures.add(future);
             // Rate-limit so GDMF isn't that mad
-            try {
-                Thread.sleep(20);
-            } catch (InterruptedException e) {
-                LOGGER.error("Interrupted sleeping for GDMF rate limit.", e);
-            }
+//            try {
+//                Thread.sleep(20);
+//            } catch (InterruptedException e) {
+//                LOGGER.error("Interrupted sleeping for GDMF rate limit.", e);
+//            }
         }
 
         // Wait for them all to complete
