@@ -11,6 +11,8 @@ import net.dv8tion.jda.api.OnlineStatus;
 import net.dv8tion.jda.api.entities.Activity;
 import net.dv8tion.jda.api.entities.Guild;
 import net.dv8tion.jda.api.entities.TextChannel;
+import org.apache.commons.compress.archivers.zip.ZipArchiveEntry;
+import org.apache.commons.compress.archivers.zip.ZipFile;
 import org.apache.commons.io.IOUtils;
 import org.apache.http.client.methods.CloseableHttpResponse;
 import org.apache.http.client.methods.HttpPost;
@@ -24,23 +26,20 @@ import org.xml.sax.SAXException;
 
 import javax.xml.parsers.ParserConfigurationException;
 import java.awt.*;
-import java.io.BufferedReader;
-import java.io.File;
 import java.io.IOException;
-import java.io.InputStreamReader;
+import java.io.InputStream;
+import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.text.DecimalFormat;
 import java.text.ParseException;
-import java.util.Comparator;
-import java.util.LinkedHashMap;
+import java.util.*;
 import java.util.List;
-import java.util.Map;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 
 public class TssUtils {
-    public static final Thread PRESENCE_THREAD = new Thread("Presence");
     private static final Logger LOGGER = LoggerFactory.getLogger(TssUtils.class);
     private static final String TSS_REQUEST_TEMPLATE = """
             <?xml version="1.0" encoding="UTF-8"?>
@@ -73,26 +72,9 @@ public class TssUtils {
     private static final DecimalFormat DECIMAL_FORMAT = new DecimalFormat("0.0");
 
     private static ScheduledExecutorService presenceScheduler;
-    private static double tssProgressPercent = 0.0;
-
-    public static BuildIdentity buildIdentityFromBm(File bm, String boardId) throws PropertyListFormatException, IOException, ParseException, ParserConfigurationException, SAXException {
-        NSDictionary rootDict = (NSDictionary) PropertyListParser.parse(bm);
-        NSObject[] buildIdentities = ((NSArray) rootDict.objectForKey("BuildIdentities")).getArray();
-        // Loop through all the identities in BM
-        for (NSObject buildIdentityObj : buildIdentities) {
-            if (!buildIdentityObj.getClass().equals(NSDictionary.class)) return null;
-            NSDictionary buildIdentityPlist = (NSDictionary) buildIdentityObj;
-            // Get info of this current build identity
-            NSDictionary info = (NSDictionary) buildIdentityPlist.objectForKey("Info");
-            String currentBoardId = info.objectForKey("DeviceClass").toString();
-            if (!currentBoardId.equalsIgnoreCase(boardId)) continue;
-            return new BuildIdentity(((NSData) buildIdentityPlist.objectForKey("UniqueBuildID")).getBase64EncodedData())
-                    .setApBoardID(buildIdentityPlist.objectForKey("ApBoardID").toString())
-                    .setApChipID(buildIdentityPlist.objectForKey("ApChipID").toString())
-                    .setApSecurityDomain(buildIdentityPlist.objectForKey("ApSecurityDomain").toString());
-        }
-        return null;
-    }
+    private static double tssProgressCurrent = 0.0;
+    private static double tssProgressTotal = 1.0;
+    static boolean somethingGotUnsigned = false;
 
     public static SigningStatus tssCheckSigned(BuildIdentity buildIdentity) throws IOException {
         String requestString = TSS_REQUEST_TEMPLATE.replaceFirst("\\{\\{UBID}}", buildIdentity.getBuildIdentityB64())
@@ -119,50 +101,90 @@ public class TssUtils {
             return SigningStatus.UNKNOWN;
     }
 
-    public static File downloadBmFromUrl(String url) throws IOException, InterruptedException {
-        ProcessBuilder processBuilder = new ProcessBuilder("pzb", "-g", "AssetData/boot/BuildManifest.plist", url);
-        Process process = processBuilder.start();
-        BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()));
-        while (reader.readLine() != null) ;
-        process.waitFor();
-        return new File("BuildManifest.plist");
+    public static BuildIdentity buildIdentityFromUrl(String urlString, String boardId) throws IOException, InterruptedException, PropertyListFormatException, ParseException, ParserConfigurationException, SAXException {
+        InputStream buildManifestInputStream = buildManifestInputStreamFromUrl(urlString);
+
+        NSDictionary rootDict = (NSDictionary) PropertyListParser.parse(buildManifestInputStream);
+        NSObject[] buildIdentities = ((NSArray) rootDict.objectForKey("BuildIdentities")).getArray();
+        // Loop through all the identities in BM
+        for (NSObject buildIdentityObj : buildIdentities) {
+            if (!buildIdentityObj.getClass().equals(NSDictionary.class)) return null;
+            NSDictionary buildIdentityPlist = (NSDictionary) buildIdentityObj;
+            // Get info of this current build identity
+            NSDictionary info = (NSDictionary) buildIdentityPlist.objectForKey("Info");
+            String currentBoardId = info.objectForKey("DeviceClass").toString();
+            if (!currentBoardId.equalsIgnoreCase(boardId)) continue;
+            return new BuildIdentity(((NSData) buildIdentityPlist.objectForKey("UniqueBuildID")).getBase64EncodedData())
+                    .setApBoardID(buildIdentityPlist.objectForKey("ApBoardID").toString())
+                    .setApChipID(buildIdentityPlist.objectForKey("ApChipID").toString())
+                    .setApSecurityDomain(buildIdentityPlist.objectForKey("ApSecurityDomain").toString());
+        }
+        return null;
+    }
+
+    private static InputStream buildManifestInputStreamFromUrl(String urlString) throws IOException {
+        URL url = new URL(urlString);
+        ZipFile otaZip = new ZipFile(new HttpChannel(url), "BM: " + urlString, StandardCharsets.UTF_8.name(), true, true);
+        ZipArchiveEntry buildManifestEntry = otaZip.getEntry("AssetData/boot/BuildManifest.plist");
+        return otaZip.getInputStream(buildManifestEntry);
     }
 
     public static boolean runTssScanner(GlobalObject globalObject) {
-        boolean somethingGotUnsigned = false;
-
-        int attempts = 0;
-        int maxAttempts = 3;
-
         // Update presence every so often
         presenceScheduler = Executors.newScheduledThreadPool(1);
-        presenceScheduler.scheduleAtFixedRate(() -> {
-            Main.jda.getPresence().setPresence(OnlineStatus.ONLINE,
-                    Activity.playing(DECIMAL_FORMAT.format(tssProgressPercent) + "% checking TSS..."));
-        }, 0, 5, TimeUnit.SECONDS);
+        presenceScheduler.scheduleAtFixedRate(() -> Main.jda.getPresence().setPresence(OnlineStatus.ONLINE,
+                Activity.playing("Checking TSS... " +
+                        DECIMAL_FORMAT.format((tssProgressCurrent / tssProgressTotal) * 100) + "%")),
+                0, 5, TimeUnit.SECONDS);
 
-        while (true) {
-            LOGGER.debug("Starting TSS scanner...");
+        LOGGER.debug("Starting TSS scanner...");
 
-            List<BuildIdentity> buildIdentities = null;
-            try {
-                buildIdentities = MongoUtils.fetchAllSignedBuildIdentities();
-            } catch (Exception e) {
-                // Try again (because of while true loop) but on third try, just quit
-                if (++attempts > maxAttempts) {
-                    Main.jda.getPresence().setPresence(OnlineStatus.IDLE, null);
-                    LOGGER.error("Interrupted. Quitting, max attempts was three.");
-                    throw new RuntimeException(e);
+        List<BuildIdentity> buildIdentities = MongoUtils.fetchAllSignedBuildIdentities();
+
+        tssProgressTotal = buildIdentities.size();
+
+        ArrayList<CompletableFuture<Void>> completableFutures = new ArrayList<>();
+
+        for (BuildIdentity buildIdentity : buildIdentities) {
+            // Make the async code
+            Runnable runnable = buildTssRunnable(globalObject, buildIdentity);
+            // Queue it to run
+            CompletableFuture<Void> future = CompletableFuture.runAsync(() -> {
+                try {
+                    runnable.run();
+                } finally {
+                    // Increment the progress upon completion
+                    tssProgressCurrent++;
                 }
-                LOGGER.error("Interrupted. Trying again.");
-                continue;
+            }, TimerUtils.EXECUTOR_SERVICE); // In our custom thread pool for *speed*
+            // Add it to a list to check if they're all completed
+            completableFutures.add(future);
+            // Rate-limit so TSS isn't that mad
+            try {
+                Thread.sleep(20);
+            } catch (InterruptedException e) {
+                LOGGER.error("Interrupted sleeping for TSS rate limit.", e);
             }
-            for (int i = 0; i < buildIdentities.size(); i++) {
-                BuildIdentity buildIdentity = buildIdentities.get(i);
-                Asset asset = buildIdentity.getAsset();
-                LOGGER.debug("Checking if " + asset.getSupportedDevicesPretty() + " " + asset.getHumanReadableName() + " (" + asset.getBuildId() + ")" + " is unsigned...");
+        }
 
-                tssProgressPercent = ((double) i / buildIdentities.size()) * 100;
+        // Wait for them all to complete
+        CompletableFuture<Void> c = CompletableFuture.allOf(completableFutures.toArray(new CompletableFuture[0]));
+        c.join();
+
+        shutdownPresenceMonitor();
+        Main.jda.getPresence().setPresence(OnlineStatus.IDLE, null);
+        LOGGER.debug("Finished scanning TSS.");
+        return somethingGotUnsigned;
+    }
+
+    private static Runnable buildTssRunnable(GlobalObject globalObject, BuildIdentity buildIdentity) {
+        return () -> {
+            int attempts = 0;
+            int maxAttempts = 3;
+
+            while (true) {
+                Asset asset = buildIdentity.getAsset();
+                LOGGER.debug("Checking if " + buildIdentity);
 
                 try {
                     SigningStatus signingStatus = tssCheckSigned(buildIdentity);
@@ -184,27 +206,37 @@ public class TssUtils {
                                 .addField("URL", asset.getFullUrl(), false);
 
                         channel.sendMessageEmbeds(embedBuilder.build()).queue();
+                    } else if (signingStatus == SigningStatus.UNKNOWN) {
+                        LOGGER.debug("Unknown signing status for " + buildIdentity + ". Likely soft rate-limited. Trying again.");
+                        Thread.sleep(500);
+                        continue;
                     }
-                } catch (IOException e) {
-                    e.printStackTrace();
-                    LOGGER.error("Continuing anyways.");
+                } catch (IOException | InterruptedException e) {
+                    // Try again (because of while true loop) but on third try, just quit
+                    if (++attempts > maxAttempts) {
+                        Main.jda.getPresence().setPresence(OnlineStatus.IDLE, null);
+                        LOGGER.error("Caught exception. Quitting, max attempts was three.");
+                        throw new RuntimeException(e);
+                    }
+                    LOGGER.error("Caught exception. Trying again.", e);
+                    continue;
                 }
+                return;
             }
-            shutdownPresenceMonitor();
-            Main.jda.getPresence().setPresence(OnlineStatus.IDLE, null);
-            LOGGER.debug("Finished scanning TSS.");
-            return somethingGotUnsigned;
-        }
+        };
     }
 
     static void shutdownPresenceMonitor() {
-        presenceScheduler.shutdown();
-        tssProgressPercent = 0;
-        try {
-            // TODO: Ignore this somehow
-            presenceScheduler.awaitTermination(3, TimeUnit.SECONDS);
-        } catch (InterruptedException e) {
-            LOGGER.error("Interrupted shutting down presence monitor, but we don't care.");
+        if (presenceScheduler != null) {
+            presenceScheduler.shutdown();
+            tssProgressCurrent = 0.0;
+            tssProgressTotal = 1.0;
+            try {
+                //noinspection ResultOfMethodCallIgnored
+                presenceScheduler.awaitTermination(3, TimeUnit.SECONDS);
+            } catch (InterruptedException e) {
+                LOGGER.error("Interrupted shutting down presence monitor, but we don't care.");
+            }
         }
     }
 

@@ -20,29 +20,4 @@ COPY --from=TEMP_BUILD_IMAGE $APP_HOME/build/libs/$ARTIFACT_NAME .
 COPY AppleROOTCA.pem .
 COPY devices.txt .
 
-RUN apt-get update
-RUN apt-get install -y \
-    autoconf \
-    autoconf-archive \
-    autogen \
-    automake \
-    libtool \
-    m4 \
-    make \
-    pkg-config \
-    libzip-dev \
-    build-essential \
-    checkinstall \
-    git \
-    libtool-bin \
-    libreadline-dev \
-    libcurl4-openssl-dev \
-    libssl-dev
-WORKDIR /tmp/build
-COPY script.sh .
-RUN ./script.sh
-RUN ldconfig -v
-WORKDIR $APP_HOME
-RUN rm -rf /tmp/build script.sh
-
 ENTRYPOINT exec java -jar "${ARTIFACT_NAME}"

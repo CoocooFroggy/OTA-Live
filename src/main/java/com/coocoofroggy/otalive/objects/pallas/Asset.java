@@ -49,6 +49,19 @@ public class Asset {
         // We don't check humanReadableName because one of the assets may not have fetched it yet
     }
 
+    @Override
+    public String toString() {
+        return "Asset{" +
+                "osVersion='" + osVersion + '\'' +
+                ", baseUrl='" + baseUrl + '\'' +
+                ", relativePath='" + relativePath + '\'' +
+                ", buildId='" + buildId + '\'' +
+                ", suDocumentationId='" + suDocumentationId + '\'' +
+                ", supportedDevices=" + supportedDevices +
+                ", humanReadableName='" + humanReadableName + '\'' +
+                '}';
+    }
+
     public String getOsVersion() {
         return osVersion;
     }

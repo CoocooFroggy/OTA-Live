@@ -31,8 +31,8 @@ dependencies {
     implementation group: 'org.apache.httpcomponents', name: 'httpclient', version: '4.5.13'
     // https://mvnrepository.com/artifact/commons-io/commons-io
     implementation group: 'commons-io', name: 'commons-io', version: '2.11.0'
-    // https://mvnrepository.com/artifact/org.apache.commons/commons-compress
-    implementation group: 'org.apache.commons', name: 'commons-compress', version: '1.21'
+    // Commons compress 1.22 local build — 1.22 doesn't exist yet on mavenCentral
+    implementation files('libs/commons-compress-1.22-SNAPSHOT.jar')
     // https://mvnrepository.com/artifact/com.googlecode.plist/dd-plist
     implementation group: 'com.googlecode.plist', name: 'dd-plist', version: '1.23'
 }

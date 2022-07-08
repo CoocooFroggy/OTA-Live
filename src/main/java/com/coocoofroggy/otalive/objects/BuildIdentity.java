@@ -14,6 +14,18 @@ public class BuildIdentity {
     public BuildIdentity() {
     }
 
+    @Override
+    public String toString() {
+        return "BuildIdentity{" +
+                "buildIdentityB64='" + buildIdentityB64 + '\'' +
+                ", signed=" + signed +
+                ", apBoardID='" + apBoardID + '\'' +
+                ", apChipID='" + apChipID + '\'' +
+                ", apSecurityDomain='" + apSecurityDomain + '\'' +
+                ", asset=" + asset +
+                '}';
+    }
+
     public BuildIdentity(String buildIdentityB64) {
         this.buildIdentityB64 = buildIdentityB64;
         this.signed = true;

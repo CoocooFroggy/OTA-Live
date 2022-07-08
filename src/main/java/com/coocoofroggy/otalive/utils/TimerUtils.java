@@ -8,6 +8,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.LinkedHashMap;
+import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
@@ -16,10 +17,11 @@ public class TimerUtils {
     private static final Logger LOGGER = LoggerFactory.getLogger(TimerUtils.class);
     private static final ScheduledExecutorService SCHEDULER =
             Executors.newScheduledThreadPool(1);
+    static final ExecutorService EXECUTOR_SERVICE = Executors.newCachedThreadPool();
 
     public static void startLoopScheduler() {
         final Runnable scanner = TimerUtils::scanLoop;
-        SCHEDULER.scheduleAtFixedRate(scanner, 0, 1, TimeUnit.MINUTES);
+        SCHEDULER.scheduleAtFixedRate(scanner, 0, 10, TimeUnit.SECONDS);
     }
 
     public static void scanLoop() {

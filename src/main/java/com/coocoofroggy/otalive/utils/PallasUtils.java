@@ -17,6 +17,8 @@ import net.dv8tion.jda.api.entities.Guild;
 import net.dv8tion.jda.api.entities.Message;
 import net.dv8tion.jda.api.entities.TextChannel;
 import org.apache.commons.codec.binary.Base64;
+import org.apache.commons.compress.archivers.zip.ZipArchiveEntry;
+import org.apache.commons.compress.archivers.zip.ZipFile;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.IOUtils;
 import org.apache.http.client.methods.CloseableHttpResponse;
@@ -24,25 +26,22 @@ import org.apache.http.client.methods.HttpPost;
 import org.apache.http.entity.StringEntity;
 import org.apache.http.impl.client.CloseableHttpClient;
 import org.apache.http.impl.client.HttpClients;
+import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.xml.sax.SAXException;
 
 import javax.xml.parsers.ParserConfigurationException;
-import java.io.BufferedReader;
 import java.io.File;
 import java.io.IOException;
-import java.io.InputStreamReader;
+import java.io.InputStream;
+import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.text.DecimalFormat;
 import java.text.ParseException;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
-import java.util.concurrent.Executors;
-import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.TimeUnit;
+import java.util.*;
+import java.util.concurrent.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
@@ -51,7 +50,6 @@ public class PallasUtils {
     public static final Pattern DEVICE_NAME_PATTERN = Pattern.compile("(.*?)\\d.*");
     private static final Gson gson = new Gson();
     private static final Logger LOGGER = LoggerFactory.getLogger(PallasUtils.class);
-    private static final Pattern PZB_FILE_PATTERN = Pattern.compile(" f (.*)");
     private static final String[] DEV_KEYWORDS = new String[]{
             "development", "kasan", "debug", "diag", "factory", "device_map", "dev.im4p"
     };
@@ -61,49 +59,99 @@ public class PallasUtils {
     private static final DecimalFormat DECIMAL_FORMAT = new DecimalFormat("0.0");
 
     private static ScheduledExecutorService presenceScheduler;
-    private static double scanProgressPercent = 0.0;
+    private static double scanProgressCurrent = 0.0;
+    private static double scanProgressTotal = 1.0;
+    static boolean newFirmwareReleased = false;
 
     public static boolean runGdmfScanner(GlobalObject globalObject) {
-        boolean newFirmwareReleased = false;
-
-        int attempts = 0;
-        int maxAttempts = 3;
+        newFirmwareReleased = false;
 
         // Update presence every so often
         presenceScheduler = Executors.newScheduledThreadPool(1);
-        presenceScheduler.scheduleAtFixedRate(() -> {
-            Main.jda.getPresence().setPresence(OnlineStatus.ONLINE,
-                    Activity.playing(DECIMAL_FORMAT.format(scanProgressPercent) + "% scanning..."));
-        }, 0, 5, TimeUnit.SECONDS);
+        presenceScheduler.scheduleAtFixedRate(() -> Main.jda.getPresence().setPresence(OnlineStatus.ONLINE,
+                        Activity.playing("Scanning... " +
+                                DECIMAL_FORMAT.format((scanProgressCurrent / scanProgressTotal) * 100) + "%")),
+                0, 5, TimeUnit.SECONDS);
 
-        while (true) {
-            LOGGER.debug("Starting scanner...");
-            try {
-                // Processed assets to skip
-                List<Asset> processedAssets = MongoUtils.fetchAllProcessedAssets();
+        LOGGER.debug("Starting scanner...");
+        // Processed assets to skip
+        List<Asset> processedAssets = MongoUtils.fetchAllProcessedAssets();
 
-                List<String> lines = FileUtils.readLines(new File("devices.txt"), StandardCharsets.UTF_8);
-                // Loop through all devices
-                for (int i = 0; i < lines.size(); i++) {
-                    String line = lines.get(i);
-                    if (line.isBlank() || line.startsWith("//")) continue;
-                    String[] split = line.split(";");
-                    String device = split[0];
-                    String boardId = split[1];
-                    String deviceHumanName = split[2];
+        List<String> lines;
+        try {
+            lines = FileUtils.readLines(new File("devices.txt"), StandardCharsets.UTF_8);
+        } catch (IOException e) {
+            LOGGER.error("Couldn't read devices.txt lines.");
+            throw new RuntimeException(e);
+        }
 
-                    // Update progress bar
-                    scanProgressPercent = ((double) i / lines.size()) * 100;
+        scanProgressTotal = lines.size();
 
+        ArrayList<CompletableFuture<Void>> completableFutures = new ArrayList<>();
+
+        // Loop through all devices
+        for (String line : lines) {
+            if (line.isBlank() || line.startsWith("//")) {
+                scanProgressCurrent++;
+                continue;
+            }
+            String[] split = line.split(";");
+            String device = split[0];
+            String boardId = split[1];
+            String deviceHumanName = split[2];
+
+            // Make the async code
+            Runnable runnable = buildGdmfDeviceRunnable(globalObject, processedAssets, device, boardId, deviceHumanName);
+            // Queue it to run
+            CompletableFuture<Void> future = CompletableFuture.runAsync(() -> {
+                try {
+                    runnable.run();
+                } finally {
+                    // Increment the progress upon completion
+                    scanProgressCurrent++;
+                }
+            }, TimerUtils.EXECUTOR_SERVICE); // In our custom thread pool for *speed*
+            // Add it to a list to check if they're all completed
+            completableFutures.add(future);
+        }
+
+        // Wait for them all to complete
+        CompletableFuture<Void> c = CompletableFuture.allOf(completableFutures.toArray(new CompletableFuture[0]));
+        c.join();
+
+        shutdownPresenceMonitor();
+        Main.jda.getPresence().setPresence(OnlineStatus.IDLE, null);
+
+        LOGGER.debug("Scanner finished.");
+        return newFirmwareReleased;
+    }
+
+    @NotNull
+    private static Runnable buildGdmfDeviceRunnable(GlobalObject globalObject, List<Asset> processedAssets, String device, String boardId, String deviceHumanName) {
+        // Define our runnable
+        return () -> {
+            int attempts = 0;
+            int maxAttempts = 3;
+
+            while (true) {
+                try {
                     for (String assetAudience : globalObject.getAssetAudiences()) {
                         PallasResponse suPallasResponse = fetchSuPallasResponse(device, boardId, assetAudience);
-                        if (suPallasResponse == null) continue; // Skip this asset audience for device if null
+                        if (suPallasResponse == null) {
+                            // Try again (because of while true loop) but on third try, just quit
+                            if (++attempts > maxAttempts) {
+                                Main.jda.getPresence().setPresence(OnlineStatus.IDLE, null);
+                                LOGGER.error("Pallas responded with null. Quitting, max attempts was three.");
+                                return;
+                            }
+                            LOGGER.error("Pallas response is null. Trying again.");
+                            continue;
+                        }
 
-                        assetLoopLabel:
                         for (Asset asset : suPallasResponse.getAssets()) {
                             // If this is a new asset, process it
                             if (!processedAssets.contains(asset)) {
-                                LOGGER.info("NEW: " + asset.getSupportedDevicesPretty() + " " + asset.getSuDocumentationId() + " (" + asset.getBuildId() + ")");
+                                LOGGER.info("NEW: " + asset);
                                 newFirmwareReleased = true;
                                 Guild guild = Main.jda.getGuildById(globalObject.getGuildId());
                                 TextChannel channel = guild.getTextChannelById(globalObject.getChannelId());
@@ -117,12 +165,12 @@ public class PallasUtils {
                                 }
 
                                 PallasResponse docPallasResponse = fetchDocPallasResponse(device, assetAudience, asset, matcher);
-                                if (docPallasResponse == null) continue assetLoopLabel;
+                                if (docPallasResponse == null) continue;
 
                                 // Not iterating through assets because there should not be multiple documentations. Just use the first.
                                 // Get human-readable name
-                                File docStringsFile = downloadDocumentationStringsFromUrl(docPallasResponse.getAssets().get(0).getFullUrl());
-                                asset.setHumanReadableName(humanReadableFromDocStrings(docStringsFile));
+                                asset.setHumanReadableName(
+                                        humanReadableFromDocUrl(docPallasResponse.getAssets().get(0).getFullUrl()));
 
                                 EmbedBuilder embedBuilder = new EmbedBuilder();
                                 // iOS16Beta2 — iPhone11,8
@@ -147,11 +195,10 @@ public class PallasUtils {
                                 message.editMessageEmbeds(embedBuilder.build()).queue();
 
                                 // Get BuildIdentity data for TSS
-                                File bm = TssUtils.downloadBmFromUrl(asset.getFullUrl());
-                                BuildIdentity buildIdentity = TssUtils.buildIdentityFromBm(bm, boardId);
+                                BuildIdentity buildIdentity = TssUtils.buildIdentityFromUrl(asset.getFullUrl(), boardId);
                                 // Should never trigger. But just in case
                                 if (buildIdentity == null) {
-                                    LOGGER.error("BM for " + device + " (" + buildIdentity + ") is null. Skipping this asset—not adding it to Build Identities collection.");
+                                    LOGGER.error("BM for " + device + " (" + asset.getSuDocumentationId() + ") is null. Skipping this asset—not adding it to Build Identities collection.");
                                     channel.sendMessage("<@353561670934855681> couldn't parse data from BM 🚨.").queue();
                                     message.editMessage("Failed to parse BuildManifest—you may see the embed below duplicated at a later point in time.").queue();
                                     continue;
@@ -162,42 +209,36 @@ public class PallasUtils {
                                 buildIdentity.setAsset(asset);
                                 MongoUtils.insertBuildIdentity(buildIdentity);
                             } else {
-                                LOGGER.debug("Old: " + asset.getSupportedDevicesPretty() + " " + asset.getSuDocumentationId() + " (" + asset.getBuildId() + ")");
+                                LOGGER.debug("Old: " + asset);
                             }
                         }
                     }
+                    break;
+                } catch (IOException | InterruptedException | PropertyListFormatException |
+                         ParseException | ParserConfigurationException | SAXException e) {
+                    // Try again (because of while true loop) but on third try, just quit
+                    if (++attempts > maxAttempts) {
+                        Main.jda.getPresence().setPresence(OnlineStatus.IDLE, null);
+                        LOGGER.error("Caught exception. Quitting, max attempts was three.");
+                        throw new RuntimeException(e);
+                    }
+                    LOGGER.error("Caught exception. Trying again.", e);
                 }
-
-                shutdownPresenceMonitor();
-                Main.jda.getPresence().setPresence(OnlineStatus.IDLE, null);
-
-                LOGGER.debug("Scanner finished.");
-                return newFirmwareReleased; // Otherwise we'd be stuck in infinite while true loop
-            } catch (InterruptedException e) {
-                // Try again (because of while true loop) but on third try, just quit
-                if (++attempts > maxAttempts) {
-                    Main.jda.getPresence().setPresence(OnlineStatus.IDLE, null);
-                    LOGGER.error("Interrupted. Quitting, max attempts was three.");
-                    throw new RuntimeException(e);
-                }
-                LOGGER.error("Interrupted. Trying again.", e);
-            } catch (IOException | PropertyListFormatException | ParseException | ParserConfigurationException |
-                     SAXException e) {
-                Main.jda.getPresence().setPresence(OnlineStatus.IDLE, null);
-                LOGGER.error("Scanner terminated early.");
-                throw new RuntimeException(e);
             }
-        }
+        };
     }
 
     static void shutdownPresenceMonitor() {
-        presenceScheduler.shutdown();
-        scanProgressPercent = 0;
-        try {
-            // TODO: Ignore this somehow
-            presenceScheduler.awaitTermination(3, TimeUnit.SECONDS);
-        } catch (InterruptedException e) {
-            LOGGER.error("Interrupted shutting down presence monitor, but we don't care.");
+        if (presenceScheduler != null) {
+            presenceScheduler.shutdown();
+            scanProgressCurrent = 0.0;
+            scanProgressTotal = 1.0;
+            try {
+                //noinspection ResultOfMethodCallIgnored
+                presenceScheduler.awaitTermination(3, TimeUnit.SECONDS);
+            } catch (InterruptedException e) {
+                LOGGER.error("Interrupted shutting down presence monitor, but we don't care.");
+            }
         }
     }
 
@@ -319,20 +360,15 @@ public class PallasUtils {
     }
 
     private static List<String> listDevFiles(String urlString, String boardId) throws IOException, InterruptedException {
-        ProcessBuilder processBuilder = new ProcessBuilder("pzb", "-l", urlString);
-        Process process = processBuilder.start();
-        BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()));
-        StringBuilder output = new StringBuilder();
-        String line;
-        while ((line = reader.readLine()) != null)
-            output.append(line).append("\n");
-        process.waitFor();
+        URL url = new URL(urlString);
+        ZipFile otaZip = new ZipFile(new HttpChannel(url), "Dev Files: " + urlString, StandardCharsets.UTF_8.name(), true, true);
 
         List<String> devFiles = new ArrayList<>();
-        Matcher matcher = PZB_FILE_PATTERN.matcher(output.toString());
-        lineLabel:
-        while (matcher.find()) {
-            String fileName = matcher.group(1);
+        // Loop through all files and add them to devFiles
+        entryLabel:
+        for (Iterator<ZipArchiveEntry> it = otaZip.getEntries().asIterator(); it.hasNext(); ) {
+            ZipArchiveEntry entry = it.next();
+            String fileName = entry.getName();
             for (String keyword : DEV_KEYWORDS) {
                 // If it's a dev file
                 if (fileName.toLowerCase().contains(keyword)) {
@@ -343,33 +379,32 @@ public class PallasUtils {
                             if (fileName.toLowerCase().contains(boardId.substring(0, 4).toLowerCase()))
                                 devFiles.add(fileName);
                             // It will only match one special case—no need to check others
-                            continue lineLabel;
+                            continue entryLabel;
                         }
                     }
                     // if it's a plist file we usually don't care
-                    if (fileName.endsWith(".plist") && !fileName.contains("device_map")) continue lineLabel;
+                    if (fileName.endsWith(".plist") && !fileName.contains("device_map")) continue entryLabel;
                     // It's not a special case if we reach here
                     devFiles.add(fileName);
-                    // Go to next line—we already found match
-                    continue lineLabel;
+                    // Go to next entry—we already found match
+                    continue entryLabel;
                 }
             }
         }
         return devFiles;
     }
 
-    public static File downloadDocumentationStringsFromUrl(String url) throws IOException, InterruptedException {
-        ProcessBuilder processBuilder = new ProcessBuilder("pzb", "-g", "AssetData/en.lproj/documentation.strings", url);
-        Process process = processBuilder.start();
-        BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()));
-        while (reader.readLine() != null) ;
-        process.waitFor();
-        return new File("documentation.strings");
-    }
+    public static String humanReadableFromDocUrl(String urlString) throws IOException, InterruptedException, PropertyListFormatException, ParseException, ParserConfigurationException, SAXException {
+        InputStream documentationStringsInputStream = documentationStringsInputStreamFromUrl(urlString);
 
-    public static String humanReadableFromDocStrings(File file) throws PropertyListFormatException, IOException, ParseException, ParserConfigurationException, SAXException {
-        NSDictionary rootDict = (NSDictionary) PropertyListParser.parse(file);
+        NSDictionary rootDict = (NSDictionary) PropertyListParser.parse(documentationStringsInputStream);
         return rootDict.objectForKey("HumanReadableUpdateName").toString();
     }
 
+    private static InputStream documentationStringsInputStreamFromUrl(String urlString) throws IOException {
+        URL url = new URL(urlString);
+        ZipFile otaZip = new ZipFile(new HttpChannel(url), "Documentation: " + urlString, StandardCharsets.UTF_8.name(), true, true);
+        ZipArchiveEntry documentationEntry = otaZip.getEntry("AssetData/en.lproj/documentation.strings");
+        return otaZip.getInputStream(documentationEntry);
+    }
 }
