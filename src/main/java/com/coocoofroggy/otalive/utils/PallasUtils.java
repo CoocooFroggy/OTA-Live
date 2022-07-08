@@ -233,7 +233,7 @@ public class PallasUtils {
     }
 
     @Nullable
-    private static PallasResponse fetchDocPallasResponse(String device, String assetAudience, Asset asset, Matcher matcher) throws IOException {
+    private static PallasResponse fetchDocPallasResponse(String device, String assetAudience, Asset asset, Matcher matcher) throws IOException, InterruptedException {
         PallasResponse docPallasResponse;
         int docAttempts = 0;
         while (true) {
@@ -248,6 +248,7 @@ public class PallasUtils {
                     LOGGER.error("Skipping asset for " + device + " because documentation (" + asset.getSuDocumentationId() + ") is null or empty.");
                     return null;
                 }
+                Thread.sleep(1000);
                 continue;
             }
             // Otherwise break out of loop: we have the asset
@@ -257,7 +258,7 @@ public class PallasUtils {
     }
 
     @Nullable
-    private static PallasResponse fetchSuPallasResponse(String device, String boardId, String assetAudience) throws IOException {
+    private static PallasResponse fetchSuPallasResponse(String device, String boardId, String assetAudience) throws IOException, InterruptedException {
         PallasResponse suPallasResponse;
         int suAttempts = 0;
         while (true) {
@@ -282,6 +283,7 @@ public class PallasUtils {
                     LOGGER.error("Skipping asset audience (" + assetAudience + ") for " + device + " because JSON deserialization was null.");
                     return null;
                 }
+                Thread.sleep(1000);
                 continue;
             }
             // Otherwise break out of loop: we have the assets
