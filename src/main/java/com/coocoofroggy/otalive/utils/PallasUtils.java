@@ -247,7 +247,7 @@ public class PallasUtils {
             String docResponseString = docRequest(assetAudience, asset.getSuDocumentationId(), matcher.group(1));
             docPallasResponse = parseJwt(docResponseString);
             // If there are no assets, retry
-            if (docPallasResponse == null || docPallasResponse.getAssets() == null) {
+            if (docPallasResponse == null || docPallasResponse.getAssets() == null || docPallasResponse.getAssets().isEmpty()) {
                 docAttempts++;
                 // If we hit max attempts, just go on to next asset
                 if (docAttempts >= 3) {
@@ -282,7 +282,7 @@ public class PallasUtils {
                 continue;
             }
             // If the response gives us null, retry
-            if (suPallasResponse == null || suPallasResponse.getAssets() == null || suPallasResponse.getAssets().isEmpty()) {
+            if (suPallasResponse == null || suPallasResponse.getAssets() == null) {
                 suAttempts++;
                 // If we hit max attempts, just go on to next asset audience for this device
                 if (suAttempts >= 3) {
