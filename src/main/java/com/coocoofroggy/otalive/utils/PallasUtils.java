@@ -137,16 +137,7 @@ public class PallasUtils {
                 try {
                     for (String assetAudience : globalObject.getAssetAudiences()) {
                         PallasResponse suPallasResponse = fetchSuPallasResponse(device, boardId, assetAudience);
-                        if (suPallasResponse == null) {
-                            // Try again (because of while true loop) but on third try, just quit
-                            if (++attempts > maxAttempts) {
-                                Main.jda.getPresence().setPresence(OnlineStatus.IDLE, null);
-                                LOGGER.error("Pallas responded with null. Quitting, max attempts was three.");
-                                return;
-                            }
-                            LOGGER.error("Pallas response is null. Trying again.");
-                            continue;
-                        }
+                        if (suPallasResponse == null) continue;
 
                         for (Asset asset : suPallasResponse.getAssets()) {
                             // If this is a new asset, process it
@@ -250,7 +241,7 @@ public class PallasUtils {
             String docResponseString = docRequest(assetAudience, asset.getSuDocumentationId(), matcher.group(1));
             docPallasResponse = parseJwt(docResponseString);
             // If there are no assets, retry
-            if (docPallasResponse == null || docPallasResponse.getAssets().isEmpty()) {
+            if (docPallasResponse == null || docPallasResponse.getAssets() == null || docPallasResponse.getAssets().isEmpty()) {
                 docAttempts++;
                 // If we hit max attempts, just go on to next asset
                 if (docAttempts >= 3) {
@@ -284,7 +275,7 @@ public class PallasUtils {
                 continue;
             }
             // If the response gives us null, retry
-            if (suPallasResponse == null) {
+            if (suPallasResponse == null || suPallasResponse.getAssets() == null || suPallasResponse.getAssets().isEmpty()) {
                 suAttempts++;
                 // If we hit max attempts, just go on to next asset audience for this device
                 if (suAttempts >= 3) {
