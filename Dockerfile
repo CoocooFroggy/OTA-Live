@@ -9,7 +9,7 @@ USER root
 RUN chown -R gradle /home/gradle/src
 
 COPY . .
-RUN gradle shadowJar
+RUN gradle shadowJar --no-daemon
 
 FROM eclipse-temurin:17
 ENV ARTIFACT_NAME='OTA-Live-1.0-all.jar'
