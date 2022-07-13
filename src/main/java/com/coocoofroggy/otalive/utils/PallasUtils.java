@@ -3,10 +3,10 @@ package com.coocoofroggy.otalive.utils;
 import com.coocoofroggy.otalive.Main;
 import com.coocoofroggy.otalive.objects.BuildIdentity;
 import com.coocoofroggy.otalive.objects.GlobalObject;
+import com.coocoofroggy.otalive.objects.QueuedDevUpload;
 import com.coocoofroggy.otalive.objects.pallas.Asset;
 import com.coocoofroggy.otalive.objects.pallas.PallasResponse;
 import com.dd.plist.NSDictionary;
-import com.dd.plist.PropertyListFormatException;
 import com.dd.plist.PropertyListParser;
 import com.google.gson.Gson;
 import com.google.gson.JsonSyntaxException;
@@ -30,18 +30,21 @@ import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.xml.sax.SAXException;
 
-import javax.xml.parsers.ParserConfigurationException;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.text.DecimalFormat;
-import java.text.ParseException;
-import java.util.*;
-import java.util.concurrent.*;
+import java.util.ArrayList;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Map;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
@@ -182,11 +185,21 @@ public class PallasUtils {
                                 Message message = channel.sendMessageEmbeds(embedBuilder.build()).complete();
 
                                 // Scan for dev files
-                                List<String> devFiles = listDevFiles(asset.getFullUrl(), boardId);
+                                // Makes a remote zip from URL
+                                URL url = new URL(asset.getFullUrl());
+                                ZipFile otaZip = new ZipFile(new HttpChannel(url), "Dev Files: " + asset.getFullUrl(), StandardCharsets.UTF_8.name(), true, true);
+                                // Parses out all the dev entries
+                                List<ZipArchiveEntry> devFiles = parseDevFiles(otaZip, boardId);
+                                // Turns that list into a String to put it the embed
+                                List<String> devFilesStrings = listDevFiles(devFiles);
                                 String collect = "None found";
-                                if (!devFiles.isEmpty())
-                                    collect = devFiles.stream().collect(Collectors.joining("`\n`", "`", "`"));
+                                if (!devFilesStrings.isEmpty())
+                                    collect = devFilesStrings.stream().collect(Collectors.joining("`\n`", "`", "`"));
                                 embedBuilder.setDescription("**Dev Files**\n" + collect.substring(0, Math.min(4081, collect.length())));
+                                // Queues all the uploads for dev files to Azure
+                                queueUploadDevFiles(otaZip, devFiles, url.getPath());
+                                // Close it
+                                otaZip.close();
 
                                 // Update the message
                                 message.editMessageEmbeds(embedBuilder.build()).queue();
@@ -358,11 +371,9 @@ public class PallasUtils {
         return gson.fromJson(decoded, PallasResponse.class);
     }
 
-    private static List<String> listDevFiles(String urlString, String boardId) throws IOException {
-        URL url = new URL(urlString);
-        ZipFile otaZip = new ZipFile(new HttpChannel(url), "Dev Files: " + urlString, StandardCharsets.UTF_8.name(), true, true);
-
-        List<String> devFiles = new ArrayList<>();
+    //region Dev Files
+    private static List<ZipArchiveEntry> parseDevFiles(ZipFile otaZip, String boardId) {
+        List<ZipArchiveEntry> devFiles = new ArrayList<>();
         // Loop through all files and add them to devFiles
         entryLabel:
         for (Iterator<ZipArchiveEntry> it = otaZip.getEntries().asIterator(); it.hasNext(); ) {
@@ -376,7 +387,7 @@ public class PallasUtils {
                         if (fileName.contains(s)) {
                             // Only add it to the list of dev files if it matches our board ID
                             if (fileName.toLowerCase().contains(boardId.substring(0, 4).toLowerCase()))
-                                devFiles.add(fileName);
+                                devFiles.add(entry);
                             // It will only match one special case—no need to check others
                             continue entryLabel;
                         }
@@ -384,7 +395,7 @@ public class PallasUtils {
                     // if it's a plist file we usually don't care
                     if (fileName.endsWith(".plist") && !fileName.contains("device_map")) continue entryLabel;
                     // It's not a special case if we reach here
-                    devFiles.add(fileName);
+                    devFiles.add(entry);
                     // Go to next entry—we already found match
                     continue entryLabel;
                 }
@@ -393,17 +404,40 @@ public class PallasUtils {
         return devFiles;
     }
 
-    public static String humanReadableFromDocUrl(String urlString) throws Exception {
-        InputStream documentationStringsInputStream = documentationStringsInputStreamFromUrl(urlString);
-
-        NSDictionary rootDict = (NSDictionary) PropertyListParser.parse(documentationStringsInputStream);
-        return rootDict.objectForKey("HumanReadableUpdateName").toString();
+    private static List<String> listDevFiles(List<ZipArchiveEntry> devFiles) {
+        // Turn this list into a list of Strings
+        List<String> devFilesStrings = new ArrayList<>();
+        for (ZipArchiveEntry zipArchiveEntry : devFiles) {
+            devFilesStrings.add(zipArchiveEntry.getName());
+        }
+        return devFilesStrings;
     }
 
-    private static InputStream documentationStringsInputStreamFromUrl(String urlString) throws IOException {
+    private static void queueUploadDevFiles(ZipFile otaZip, List<ZipArchiveEntry> devFiles, String path) throws IOException {
+        for (ZipArchiveEntry devFile : devFiles) {
+            // If it starts with /, remove it
+            path = path.startsWith("/") ? path.substring(1) : path;
+            // If it ends with zip, remove it
+            path = path.endsWith(".zip") ? path.substring(0, path.length() - 4) : path;
+            // Add a / if it doesn't end with one now
+            path = !path.endsWith("/") ? path + "/" : path;
+            // Now add the specific file to the path
+            path += devFile.getName();
+            TimerUtils.getQueuedDevUploads().add(new QueuedDevUpload(
+                    otaZip, devFiles, path));
+        }
+    }
+    //endregion
+
+    public static String humanReadableFromDocUrl(String urlString) throws Exception {
         URL url = new URL(urlString);
         ZipFile otaZip = new ZipFile(new HttpChannel(url), "Documentation: " + urlString, StandardCharsets.UTF_8.name(), true, true);
         ZipArchiveEntry documentationEntry = otaZip.getEntry("AssetData/en.lproj/documentation.strings");
-        return otaZip.getInputStream(documentationEntry);
+        InputStream inputStream = otaZip.getInputStream(documentationEntry);
+
+        NSDictionary rootDict = (NSDictionary) PropertyListParser.parse(inputStream);
+        otaZip.close();
+        return rootDict.objectForKey("HumanReadableUpdateName").toString();
     }
+
 }

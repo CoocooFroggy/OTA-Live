@@ -1,6 +1,7 @@
 package com.coocoofroggy.otalive;
 
 import com.coocoofroggy.otalive.listeners.DiscordListener;
+import com.coocoofroggy.otalive.utils.AzureUtils;
 import com.coocoofroggy.otalive.utils.MongoUtils;
 import com.coocoofroggy.otalive.utils.TimerUtils;
 import net.dv8tion.jda.api.JDA;
@@ -35,6 +36,7 @@ public class Main {
             throw new RuntimeException(e);
         }
         MongoUtils.connectToDb();
+        AzureUtils.connectToAzure();
         startBot();
         new Thread(Main::upsertAllCommands).start();
         TimerUtils.startLoopScheduler();

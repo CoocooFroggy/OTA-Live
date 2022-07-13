@@ -22,16 +22,13 @@ import org.apache.http.impl.client.HttpClients;
 import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.xml.sax.SAXException;
 
-import javax.xml.parsers.ParserConfigurationException;
 import java.awt.*;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.text.DecimalFormat;
-import java.text.ParseException;
 import java.util.*;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
@@ -102,7 +99,10 @@ public class TssUtils {
     }
 
     public static BuildIdentity buildIdentityFromUrl(String urlString, String boardId) throws Exception {
-        InputStream buildManifestInputStream = buildManifestInputStreamFromUrl(urlString);
+        URL url = new URL(urlString);
+        ZipFile otaZip = new ZipFile(new HttpChannel(url), "BM: " + urlString, StandardCharsets.UTF_8.name(), true, true);
+        ZipArchiveEntry buildManifestEntry = otaZip.getEntry("AssetData/boot/BuildManifest.plist");
+        InputStream buildManifestInputStream = otaZip.getInputStream(buildManifestEntry);
 
         NSDictionary rootDict = (NSDictionary) PropertyListParser.parse(buildManifestInputStream);
         NSObject[] buildIdentities = ((NSArray) rootDict.objectForKey("BuildIdentities")).getArray();
@@ -114,19 +114,15 @@ public class TssUtils {
             NSDictionary info = (NSDictionary) buildIdentityPlist.objectForKey("Info");
             String currentBoardId = info.objectForKey("DeviceClass").toString();
             if (!currentBoardId.equalsIgnoreCase(boardId)) continue;
-            return new BuildIdentity(((NSData) buildIdentityPlist.objectForKey("UniqueBuildID")).getBase64EncodedData())
+            BuildIdentity buildIdentity = new BuildIdentity(((NSData) buildIdentityPlist.objectForKey("UniqueBuildID")).getBase64EncodedData())
                     .setApBoardID(buildIdentityPlist.objectForKey("ApBoardID").toString())
                     .setApChipID(buildIdentityPlist.objectForKey("ApChipID").toString())
                     .setApSecurityDomain(buildIdentityPlist.objectForKey("ApSecurityDomain").toString());
+            otaZip.close();
+            return buildIdentity;
         }
+        otaZip.close();
         return null;
-    }
-
-    private static InputStream buildManifestInputStreamFromUrl(String urlString) throws IOException {
-        URL url = new URL(urlString);
-        ZipFile otaZip = new ZipFile(new HttpChannel(url), "BM: " + urlString, StandardCharsets.UTF_8.name(), true, true);
-        ZipArchiveEntry buildManifestEntry = otaZip.getEntry("AssetData/boot/BuildManifest.plist");
-        return otaZip.getInputStream(buildManifestEntry);
     }
 
     public static boolean runTssScanner(GlobalObject globalObject) {
