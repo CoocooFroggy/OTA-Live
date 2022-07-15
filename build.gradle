@@ -35,4 +35,6 @@ dependencies {
     implementation files('libs/commons-compress-1.22-SNAPSHOT.jar')
     // https://mvnrepository.com/artifact/com.googlecode.plist/dd-plist
     implementation group: 'com.googlecode.plist', name: 'dd-plist', version: '1.23'
+    // https://mvnrepository.com/artifact/com.azure/azure-storage-blob
+    implementation group: 'com.azure', name: 'azure-storage-blob', version: '12.18.0'
 }

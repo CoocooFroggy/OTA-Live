@@ -2,7 +2,7 @@ package com.coocoofroggy.otalive.utils;
 
 import com.coocoofroggy.otalive.objects.BuildIdentity;
 import com.coocoofroggy.otalive.objects.GlobalObject;
-import com.coocoofroggy.otalive.objects.pallas.Asset;
+import com.coocoofroggy.otalive.objects.gdmf.Asset;
 import com.mongodb.MongoClientSettings;
 import com.mongodb.client.*;
 import com.mongodb.client.model.Filters;
