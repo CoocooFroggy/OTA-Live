@@ -4,7 +4,7 @@ import com.coocoofroggy.otalive.Main;
 import com.coocoofroggy.otalive.objects.BuildIdentity;
 import com.coocoofroggy.otalive.objects.GlobalObject;
 import com.coocoofroggy.otalive.objects.SigningStatus;
-import com.coocoofroggy.otalive.objects.pallas.Asset;
+import com.coocoofroggy.otalive.objects.gdmf.Asset;
 import com.dd.plist.*;
 import net.dv8tion.jda.api.EmbedBuilder;
 import net.dv8tion.jda.api.OnlineStatus;
@@ -152,7 +152,7 @@ public class TssUtils {
                     // Increment the progress upon completion
                     tssProgressCurrent++;
                 }
-            }, TimerUtils.EXECUTOR_SERVICE); // In our custom thread pool for *speed*
+            }, TimerUtils.EXECUTOR); // In our custom thread pool for *speed*
             // Add it to a list to check if they're all completed
             completableFutures.add(future);
             // Rate-limit so TSS isn't that mad
@@ -180,7 +180,7 @@ public class TssUtils {
 
             while (true) {
                 Asset asset = buildIdentity.getAsset();
-                LOGGER.debug("Checking if " + buildIdentity);
+                LOGGER.debug("Checking if " + buildIdentity + " is signed...");
 
                 try {
                     SigningStatus signingStatus = tssCheckSigned(buildIdentity);

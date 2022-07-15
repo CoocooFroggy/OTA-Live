@@ -4,8 +4,8 @@ import com.coocoofroggy.otalive.Main;
 import com.coocoofroggy.otalive.objects.BuildIdentity;
 import com.coocoofroggy.otalive.objects.GlobalObject;
 import com.coocoofroggy.otalive.objects.QueuedDevUpload;
-import com.coocoofroggy.otalive.objects.pallas.Asset;
-import com.coocoofroggy.otalive.objects.pallas.PallasResponse;
+import com.coocoofroggy.otalive.objects.gdmf.Asset;
+import com.coocoofroggy.otalive.objects.gdmf.GdmfResponse;
 import com.dd.plist.NSDictionary;
 import com.dd.plist.PropertyListParser;
 import com.google.gson.Gson;
@@ -41,18 +41,15 @@ import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.Executors;
-import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.TimeUnit;
+import java.util.concurrent.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
-public class PallasUtils {
+public class GdmfUtils {
     public static final Pattern DEVICE_NAME_PATTERN = Pattern.compile("(.*?)\\d.*");
     private static final Gson gson = new Gson();
-    private static final Logger LOGGER = LoggerFactory.getLogger(PallasUtils.class);
+    private static final Logger LOGGER = LoggerFactory.getLogger(GdmfUtils.class);
     private static final String[] DEV_KEYWORDS = new String[]{
             "development", "kasan", "debug", "diag", "factory", "device_map", "dev.im4p"
     };
@@ -113,7 +110,7 @@ public class PallasUtils {
                     // Increment the progress upon completion
                     scanProgressCurrent++;
                 }
-            }, TimerUtils.EXECUTOR_SERVICE); // In our custom thread pool for *speed*
+            }, TimerUtils.EXECUTOR); // In our custom thread pool for *speed*
             // Add it to a list to check if they're all completed
             completableFutures.add(future);
             // Rate-limit so GDMF isn't that mad
@@ -132,11 +129,12 @@ public class PallasUtils {
         Main.jda.getPresence().setPresence(OnlineStatus.IDLE, null);
 
         LOGGER.debug("Scanner finished.");
+
         return newFirmwareReleased;
     }
 
     @NotNull
-    private static Runnable buildGdmfDeviceRunnable(GlobalObject globalObject, List<Asset> processedAssets, String device, String boardId, String deviceHumanName) {
+    private static Runnable buildGdmfDeviceRunnable(final GlobalObject globalObject, final List<Asset> processedAssets, final String device, final String boardId, final String deviceHumanName) {
         // Define our runnable
         return () -> {
             int attempts = 0;
@@ -144,80 +142,103 @@ public class PallasUtils {
 
             while (true) {
                 try {
-                    for (String assetAudience : globalObject.getAssetAudiences()) {
-                        PallasResponse suPallasResponse = fetchSuPallasResponse(device, boardId, assetAudience);
-                        if (suPallasResponse == null) continue;
+                    for (final String assetAudience : globalObject.getAssetAudiences()) {
+                        GdmfResponse suGdmfResponse = fetchSuGdmfResponse(device, boardId, assetAudience);
+                        if (suGdmfResponse == null) continue;
 
-                        for (Asset asset : suPallasResponse.getAssets()) {
+                        for (final Asset asset : suGdmfResponse.getAssets()) {
                             // If this is a new asset, process it
                             if (!processedAssets.contains(asset)) {
-                                LOGGER.info("NEW: " + asset);
+                                LOGGER.info("Queued new: " + asset);
                                 newFirmwareReleased = true;
-                                Guild guild = Main.jda.getGuildById(globalObject.getGuildId());
-                                TextChannel channel = guild.getTextChannelById(globalObject.getChannelId());
+                                // Runnable for processing this asset
+                                Callable<List<QueuedDevUpload>> newAssetCallable = () -> {
+                                    int attempts1 = 0;
+                                    int maxAttempts1 = 3;
 
-                                // Get device name
-                                Matcher matcher = DEVICE_NAME_PATTERN.matcher(device);
-                                // If there's no device name we messed up. But continue
-                                if (!matcher.find()) {
-                                    LOGGER.error("Cannot find device name for " + device);
-                                    continue;
-                                }
+                                    while (true) {
+                                        try {
+                                            LOGGER.info("Processing new: " + asset);
+                                            Guild guild = Main.jda.getGuildById(globalObject.getGuildId());
+                                            TextChannel channel = guild.getTextChannelById(globalObject.getChannelId());
 
-                                PallasResponse docPallasResponse = fetchDocPallasResponse(device, assetAudience, asset, matcher);
-                                if (docPallasResponse == null) continue;
+                                            // Get device name
+                                            Matcher matcher = DEVICE_NAME_PATTERN.matcher(device);
+                                            // If there's no device name we messed up. Skip and continue to next asset
+                                            if (!matcher.find()) {
+                                                LOGGER.error("Cannot find device name for " + device);
+                                                break;
+                                            }
 
-                                // Not iterating through assets because there should not be multiple documentations. Just use the first.
-                                // Get human-readable name
-                                asset.setHumanReadableName(
-                                        humanReadableFromDocUrl(docPallasResponse.getAssets().get(0).getFullUrl()));
+                                            GdmfResponse docGdmfResponse = fetchDocGdmfResponse(device, assetAudience, asset, matcher.group(1));
+                                            if (docGdmfResponse == null) break;
 
-                                EmbedBuilder embedBuilder = new EmbedBuilder();
-                                // iOS16Beta2 — iPhone11,8
-                                embedBuilder.setTitle("Released: " + asset.getHumanReadableName() + " — " + asset.getSupportedDevicesPretty())
-                                        .addField("Build ID", asset.getBuildId(), true)
-                                        .addField("OS Version", asset.getOsVersion(), true)
-                                        .addField("SU Documentation ID", asset.getSuDocumentationId(), true)
-                                        .addField("Device Name", deviceHumanName, true)
-                                        .addField("URL", asset.getFullUrl(), false);
+                                            // Not iterating through assets because there should not be multiple documentations. Just use the first.
+                                            // Get human-readable name
+                                            asset.setHumanReadableName(
+                                                    humanReadableFromDocUrl(docGdmfResponse.getAssets().get(0).getFullUrl()));
 
-                                // Send initial message
-                                Message message = channel.sendMessageEmbeds(embedBuilder.build()).complete();
+                                            EmbedBuilder embedBuilder = new EmbedBuilder();
+                                            // iOS16Beta2 — iPhone11,8
+                                            embedBuilder.setTitle("Released: " + asset.getHumanReadableName() + " — " + asset.getSupportedDevicesPretty())
+                                                    .addField("Build ID", asset.getBuildId(), true)
+                                                    .addField("OS Version", asset.getOsVersion(), true)
+                                                    .addField("SU Documentation ID", asset.getSuDocumentationId(), true)
+                                                    .addField("Device Name", deviceHumanName, true)
+                                                    .addField("URL", asset.getFullUrl(), false);
 
-                                // Scan for dev files
-                                // Makes a remote zip from URL
-                                URL url = new URL(asset.getFullUrl());
-                                ZipFile otaZip = new ZipFile(new HttpChannel(url), "Dev Files: " + asset.getFullUrl(), StandardCharsets.UTF_8.name(), true, true);
-                                // Parses out all the dev entries
-                                List<ZipArchiveEntry> devFiles = parseDevFiles(otaZip, boardId);
-                                // Turns that list into a String to put it the embed
-                                List<String> devFilesStrings = listDevFiles(devFiles);
-                                String collect = "None found";
-                                if (!devFilesStrings.isEmpty())
-                                    collect = devFilesStrings.stream().collect(Collectors.joining("`\n`", "`", "`"));
-                                embedBuilder.setDescription("**Dev Files**\n" + collect.substring(0, Math.min(4081, collect.length())));
-                                // Queues all the uploads for dev files to Azure
-                                queueUploadDevFiles(otaZip, devFiles, url.getPath());
-                                // Close it
-                                otaZip.close();
+                                            // Send initial message
+                                            Message message = channel.sendMessageEmbeds(embedBuilder.build()).complete();
 
-                                // Update the message
-                                message.editMessageEmbeds(embedBuilder.build()).queue();
+                                            // Scan for dev files
+                                            // Makes a remote zip from URL
+                                            URL url = new URL(asset.getFullUrl());
+                                            ZipFile otaZip = new ZipFile(new HttpChannel(url), "Dev Files: " + asset.getFullUrl(), StandardCharsets.UTF_8.name(), true, true);
+                                            // Parses out all the dev entries
+                                            List<ZipArchiveEntry> devFiles = parseDevFiles(otaZip, boardId);
+                                            // Turns that list into a String to put it the embed
+                                            List<String> devFilesStrings = listDevFiles(devFiles);
+                                            String collect = "None found";
+                                            if (!devFilesStrings.isEmpty())
+                                                collect = devFilesStrings.stream().collect(Collectors.joining("`\n`", "`", "`"));
+                                            embedBuilder.setDescription("**Dev Files**\n" + collect.substring(0, Math.min(4081, collect.length())));
 
-                                // Get BuildIdentity data for TSS
-                                BuildIdentity buildIdentity = TssUtils.buildIdentityFromUrl(asset.getFullUrl(), boardId);
-                                // Should never trigger. But just in case
-                                if (buildIdentity == null) {
-                                    LOGGER.error("BM for " + device + " (" + asset.getSuDocumentationId() + ") is null. Skipping this asset—not adding it to Build Identities collection.");
-                                    channel.sendMessage("<@353561670934855681> couldn't parse data from BM 🚨.").queue();
-                                    message.editMessage("Failed to parse BuildManifest—you may see the embed below duplicated at a later point in time.").queue();
-                                    continue;
-                                }
-                                // Mark this asset as processed in memory
-                                processedAssets.add(asset);
-                                // Mark this asset as processed in DB and add to TSS queue
-                                buildIdentity.setAsset(asset);
-                                MongoUtils.insertBuildIdentity(buildIdentity);
+                                            // Close it
+                                            otaZip.close();
+
+                                            // Update the message
+                                            message.editMessageEmbeds(embedBuilder.build()).queue();
+
+                                            // Get BuildIdentity data for TSS
+                                            BuildIdentity buildIdentity = TssUtils.buildIdentityFromUrl(asset.getFullUrl(), boardId);
+                                            // Should never trigger. But just in case
+                                            if (buildIdentity == null) {
+                                                LOGGER.error("BM for " + device + " (" + asset.getSuDocumentationId() + ") is null. Skipping this asset—not adding it to Build Identities collection.");
+                                                channel.sendMessage("<@353561670934855681> couldn't parse data from BM 🚨.").queue();
+                                                message.editMessage("Failed to parse BuildManifest—you may see the embed below duplicated at a later point in time.").queue();
+                                                break;
+                                            }
+                                            // Mark this asset as processed in memory
+                                            processedAssets.add(asset);
+                                            // Mark this asset as processed in DB and add to TSS queue
+                                            buildIdentity.setAsset(asset);
+                                            MongoUtils.insertBuildIdentity(buildIdentity);
+
+                                            // Queues all the uploads for dev files to Azure
+                                            return getQueueUploadDevFiles(otaZip, devFiles, url.getPath());
+                                        } catch (Exception e) {
+                                            // Try again (because of while true loop) but on third try, just quit
+                                            if (++attempts1 > maxAttempts1) {
+                                                Main.jda.getPresence().setPresence(OnlineStatus.IDLE, null);
+                                                LOGGER.error("Caught exception. Quitting, max attempts was three.");
+                                                throw new RuntimeException(e);
+                                            }
+                                            LOGGER.error("Caught exception. Trying again.", e);
+                                        }
+                                    }
+                                    return null;
+                                };
+                                NewAssetUtils.QUEUED_NEW_ASSET_CALLABLES.add(newAssetCallable);
                             } else {
                                 LOGGER.debug("Old: " + asset);
                             }
@@ -252,15 +273,15 @@ public class PallasUtils {
     }
 
     @Nullable
-    private static PallasResponse fetchDocPallasResponse(String device, String assetAudience, Asset asset, Matcher matcher) throws IOException, InterruptedException {
-        PallasResponse docPallasResponse;
+    private static GdmfResponse fetchDocGdmfResponse(String device, String assetAudience, Asset asset, String deviceName) throws IOException, InterruptedException {
+        GdmfResponse docGdmfResponse;
         int docAttempts = 0;
         while (true) {
             // Get Documentation from GDMF
-            String docResponseString = docRequest(assetAudience, asset.getSuDocumentationId(), matcher.group(1));
-            docPallasResponse = parseJwt(docResponseString);
+            String docResponseString = docRequest(assetAudience, asset.getSuDocumentationId(), deviceName);
+            docGdmfResponse = parseJwt(docResponseString);
             // If there are no assets, retry
-            if (docPallasResponse == null || docPallasResponse.getAssets() == null || docPallasResponse.getAssets().isEmpty()) {
+            if (docGdmfResponse == null || docGdmfResponse.getAssets() == null || docGdmfResponse.getAssets().isEmpty()) {
                 docAttempts++;
                 // If we hit max attempts, just go on to next asset
                 if (docAttempts >= 3) {
@@ -273,18 +294,18 @@ public class PallasUtils {
             // Otherwise break out of loop: we have the asset
             break;
         }
-        return docPallasResponse;
+        return docGdmfResponse;
     }
 
     @Nullable
-    private static PallasResponse fetchSuPallasResponse(String device, String boardId, String assetAudience) throws IOException, InterruptedException {
-        PallasResponse suPallasResponse;
+    private static GdmfResponse fetchSuGdmfResponse(String device, String boardId, String assetAudience) throws IOException, InterruptedException {
+        GdmfResponse suGdmfResponse;
         int suAttempts = 0;
         while (true) {
             // Get SU from GDMF
             String suResponseString = suRequest(device, boardId, assetAudience);
             try {
-                suPallasResponse = parseJwt(suResponseString);
+                suGdmfResponse = parseJwt(suResponseString);
             } catch (JsonSyntaxException e) {
                 suAttempts++;
                 // If we hit max attempts, just go on to next asset audience for this device
@@ -295,7 +316,7 @@ public class PallasUtils {
                 continue;
             }
             // If the response gives us null, retry
-            if (suPallasResponse == null || suPallasResponse.getAssets() == null) {
+            if (suGdmfResponse == null || suGdmfResponse.getAssets() == null) {
                 LOGGER.error("Null for (" + assetAudience + ") for " + device + ".");
                 suAttempts++;
                 // If we hit max attempts, just go on to next asset audience for this device
@@ -309,7 +330,7 @@ public class PallasUtils {
             // Otherwise break out of loop: we have the assets
             break;
         }
-        return suPallasResponse;
+        return suGdmfResponse;
     }
 
     public static String suRequest(String device, String boardId, String assetAudience) throws IOException {
@@ -364,11 +385,11 @@ public class PallasUtils {
         return responseString;
     }
 
-    public static PallasResponse parseJwt(String encodedString) throws JsonSyntaxException {
+    public static GdmfResponse parseJwt(String encodedString) throws JsonSyntaxException {
         // The part between the two dots is what we need
         String meat = encodedString.split("\\.")[1];
         String decoded = new String(Base64.decodeBase64(meat), StandardCharsets.UTF_8);
-        return gson.fromJson(decoded, PallasResponse.class);
+        return gson.fromJson(decoded, GdmfResponse.class);
     }
 
     //region Dev Files
@@ -413,7 +434,8 @@ public class PallasUtils {
         return devFilesStrings;
     }
 
-    private static void queueUploadDevFiles(ZipFile otaZip, List<ZipArchiveEntry> devFiles, String path) throws IOException {
+    private static List<QueuedDevUpload> getQueueUploadDevFiles(ZipFile otaZip, List<ZipArchiveEntry> devFiles, String path) {
+        List<QueuedDevUpload> toReturn = new ArrayList<>();
         for (ZipArchiveEntry devFile : devFiles) {
             // If it starts with /, remove it
             path = path.startsWith("/") ? path.substring(1) : path;
@@ -423,9 +445,10 @@ public class PallasUtils {
             path = !path.endsWith("/") ? path + "/" : path;
             // Now add the specific file to the path
             path += devFile.getName();
-            TimerUtils.getQueuedDevUploads().add(new QueuedDevUpload(
+            toReturn.add(new QueuedDevUpload(
                     otaZip, devFiles, path));
         }
+        return toReturn;
     }
     //endregion
 

@@ -1,6 +1,6 @@
 package com.coocoofroggy.otalive.objects;
 
-import com.coocoofroggy.otalive.objects.pallas.Asset;
+import com.coocoofroggy.otalive.objects.gdmf.Asset;
 
 public class BuildIdentity {
     private String buildIdentityB64;

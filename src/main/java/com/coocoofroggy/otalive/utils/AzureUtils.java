@@ -57,7 +57,7 @@ public class AzureUtils {
         @Override
         public void reportProgress(long bytesTransferred) {
             String percentage = DECIMAL_FORMAT.format((bytesTransferred / length) * 100) + "%";
-            LOGGER.debug(name + ": " + percentage);
+            LOGGER.debug("Upload progress for " + name + ": " + percentage);
         }
     }
 }
