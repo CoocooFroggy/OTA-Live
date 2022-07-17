@@ -27,3 +27,7 @@ stages:
         dockerfile: '$(Build.SourcesDirectory)/Dockerfile'
         tags: |
           $(tag)
+    - task: CmdLine@2
+      inputs:
+        script: 'docker save -o image.tar $(tag)'
+        
