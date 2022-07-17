@@ -31,7 +31,7 @@ stages:
     - task: PublishBuildArtifacts@1
       inputs:
         PathtoPublish: '$(Build.ArtifactStagingDirectory)'
-        ArtifactName: 'image.tar'
+        ArtifactName: 'Image'
         publishLocation: 'Container'
 - stage: Deploy
   displayName: Deploy
@@ -45,10 +45,10 @@ stages:
       inputs:
         buildType: 'current'
         downloadType: 'single'
-        artifactName: 'image.tar'
+        artifactName: 'Image'
         downloadPath: '$(System.ArtifactsDirectory)'
         cleanDestinationFolder: true
     - task: Bash@3
       inputs:
         filePath: '/home/coocoofroggy/otaliveupdater.sh'
-        arguments: '$SYSTEM_ARTIFACTSDIRECTORY/image.tar'
+        arguments: '$SYSTEM_ARTIFACTSDIRECTORY/Image/image.tar'
