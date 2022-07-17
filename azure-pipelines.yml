@@ -41,6 +41,12 @@ stages:
     pool:
       name: Default
     steps:
+    - task: DownloadBuildArtifacts@0
+      inputs:
+        buildType: 'current'
+        downloadType: 'single'
+        artifactName: 'image.tar'
+        downloadPath: '~'
     - task: Bash@3
       inputs:
         filePath: '~/otaliveupdater.sh'
