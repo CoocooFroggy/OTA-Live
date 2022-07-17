@@ -7,12 +7,12 @@ import java.util.List;
 
 public class QueuedDevUpload {
     ZipFile otaZip;
-    List<ZipArchiveEntry> devFiles;
+    ZipArchiveEntry devFile;
     String path;
 
-    public QueuedDevUpload(ZipFile otaZip, List<ZipArchiveEntry> devFiles, String path) {
+    public QueuedDevUpload(ZipFile otaZip, ZipArchiveEntry devFile, String path) {
         this.otaZip = otaZip;
-        this.devFiles = devFiles;
+        this.devFile = devFile;
         this.path = path;
     }
 
@@ -20,8 +20,8 @@ public class QueuedDevUpload {
         return otaZip;
     }
 
-    public List<ZipArchiveEntry> getDevFiles() {
-        return devFiles;
+    public ZipArchiveEntry getDevFile() {
+        return devFile;
     }
 
     public String getPath() {

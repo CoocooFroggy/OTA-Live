@@ -142,38 +142,37 @@ public class TimerUtils {
     private static Runnable buildDevUploadRunnable(QueuedDevUpload queuedDevUpload) {
         return () -> {
             ZipFile otaZip = queuedDevUpload.getOtaZip();
-            for (ZipArchiveEntry devFile : queuedDevUpload.getDevFiles()) {
-                int attempt = 0;
-                int maxAttempts = 3;
-                while (true) {
-                    Response<BlockBlobItem> response;
-                    try {
-                        String path = queuedDevUpload.getPath();
-                        LOGGER.info("Starting Azure upload of " + path + ".");
-                        response = AzureUtils.uploadInputStream(otaZip.getInputStream(devFile), devFile.getSize(), path);
-                        LOGGER.info("Finished uploading " + path + ".");
-                    } catch (IOException e) {
+            ZipArchiveEntry devFile = queuedDevUpload.getDevFile();
+            int attempt = 0;
+            int maxAttempts = 3;
+            while (true) {
+                Response<BlockBlobItem> response;
+                try {
+                    String path = queuedDevUpload.getPath();
+                    LOGGER.info("Starting Azure upload of " + path + ".");
+                    response = AzureUtils.uploadInputStream(otaZip.getInputStream(devFile), devFile.getSize(), path);
+                    LOGGER.info("Finished uploading " + path + ".");
+                } catch (IOException e) {
+                    if (attempt < maxAttempts) {
+                        attempt++;
+                        continue;
+                    }
+                    LOGGER.error("Caught exception in uploading dev runnable. Exiting.", e);
+                    break;
+                }
+                // If it already exists, don't check response
+                if (response != null) {
+                    // Check if status code is 2xx
+                    int statusCode = response.getStatusCode();
+                    if ((statusCode / 100) != 2) {
+                        LOGGER.error("Response code " + statusCode + " for " + queuedDevUpload.getPath() + " Azure upload.");
                         if (attempt < maxAttempts) {
                             attempt++;
                             continue;
                         }
-                        LOGGER.error("Caught exception in uploading dev runnable. Exiting.", e);
-                        break;
                     }
-                    // If it already exists, don't check response
-                    if (response != null) {
-                        // Check if status code is 2xx
-                        int statusCode = response.getStatusCode();
-                        if ((statusCode / 100) != 2) {
-                            LOGGER.error("Response code " + statusCode + " for " + queuedDevUpload.getPath() + " Azure upload.");
-                            if (attempt < maxAttempts) {
-                                attempt++;
-                                continue;
-                            }
-                        }
-                    }
-                    break;
                 }
+                break;
             }
         };
     }

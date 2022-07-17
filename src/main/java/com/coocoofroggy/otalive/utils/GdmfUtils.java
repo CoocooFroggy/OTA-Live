@@ -446,7 +446,7 @@ public class GdmfUtils {
             // Now add the specific file to the path
             newPath += devFile.getName();
             toReturn.add(new QueuedDevUpload(
-                    otaZip, devFiles, newPath));
+                    otaZip, devFile, newPath));
         }
         return toReturn;
     }
