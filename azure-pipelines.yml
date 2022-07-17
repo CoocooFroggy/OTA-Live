@@ -27,10 +27,10 @@ stages:
     - task: CmdLine@2
       displayName: Save image to file
       inputs:
-        script: 'docker save -o image.tar coocoofroggy/otalive'
+        script: 'docker save -o $BUILD_ARTIFACTSTAGINGDIRECTORY/image.tar coocoofroggy/otalive'
     - task: PublishBuildArtifacts@1
       inputs:
-        PathtoPublish: 'image.tar'
+        PathtoPublish: '$(Build.ArtifactStagingDirectory)'
         ArtifactName: 'image.tar'
         publishLocation: 'Container'
 - stage: Deploy
@@ -46,7 +46,9 @@ stages:
         buildType: 'current'
         downloadType: 'single'
         artifactName: 'image.tar'
-        downloadPath: '~'
+        downloadPath: '$(System.ArtifactsDirectory)'
+        cleanDestinationFolder: true
     - task: Bash@3
       inputs:
-        filePath: '~/otaliveupdater.sh'
+        filePath: '/home/coocoofroggy/otaliveupdater.sh'
+        arguments: '$SYSTEM_ARTIFACTSDIRECTORY/image.tar'
