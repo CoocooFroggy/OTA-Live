@@ -11,11 +11,18 @@ stages:
 - stage: Build
   displayName: Build image
   jobs:
-  - job: Build
+  - job: Build & Deploy
     displayName: Build
     pool:
       vmImage: ubuntu-latest
     steps:
+    - task: SSH@0
+      displayName: Test SSH
+      inputs:
+        sshEndpoint: 'OTA-Live-VM SSH'
+        runOptions: 'commands'
+        commands: 'echo Test'
+        readyTimeout: '20000'
     - task: Docker@2
       displayName: Build image
       inputs:
