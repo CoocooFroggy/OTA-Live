@@ -17,15 +17,17 @@ stages:
       vmImage: ubuntu-latest
     steps:
     - task: Docker@2
-      displayName: Build an image
+      displayName: Build image
       inputs:
         command: build
         dockerfile: '$(Build.SourcesDirectory)/Dockerfile'
+        repository: coocoofroggy/otalive
         tags: |
           $(tag)
     - task: CmdLine@2
+      displayName: Save image to file
       inputs:
-        script: 'docker save -o image.tar $(tag)'
+        script: 'docker save -o image.tar coocoofroggy/otalive'
     - task: CopyFilesOverSSH@0
       inputs:
         sshEndpoint: 'OTA-Live-VM SSH'
