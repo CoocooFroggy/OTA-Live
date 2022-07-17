@@ -11,8 +11,8 @@ stages:
 - stage: Build
   displayName: Build image
   jobs:
-  - job: Build and Deploy
-    displayName: Build
+  - job: Build_Deploy
+    displayName: Build & Deploy
     pool:
       vmImage: ubuntu-latest
     steps:
