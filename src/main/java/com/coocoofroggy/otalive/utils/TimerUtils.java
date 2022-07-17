@@ -148,7 +148,10 @@ public class TimerUtils {
                 while (true) {
                     Response<BlockBlobItem> response;
                     try {
-                        response = AzureUtils.uploadInputStream(otaZip.getInputStream(devFile), devFile.getSize(), queuedDevUpload.getPath());
+                        String path = queuedDevUpload.getPath();
+                        LOGGER.info("Starting Azure upload of " + path + ".");
+                        response = AzureUtils.uploadInputStream(otaZip.getInputStream(devFile), devFile.getSize(), path);
+                        LOGGER.info("Finished uploading " + path + ".");
                     } catch (IOException e) {
                         if (attempt < maxAttempts) {
                             attempt++;

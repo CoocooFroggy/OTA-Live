@@ -225,7 +225,7 @@ public class GdmfUtils {
                                             MongoUtils.insertBuildIdentity(buildIdentity);
 
                                             // Queues all the uploads for dev files to Azure
-                                            return getQueueUploadDevFiles(otaZip, devFiles, url.getPath());
+                                            return buildQueueUploadDevFiles(otaZip, devFiles, url.getPath());
                                         } catch (Exception e) {
                                             // Try again (because of while true loop) but on third try, just quit
                                             if (++attempts1 > maxAttempts1) {
@@ -434,19 +434,19 @@ public class GdmfUtils {
         return devFilesStrings;
     }
 
-    private static List<QueuedDevUpload> getQueueUploadDevFiles(ZipFile otaZip, List<ZipArchiveEntry> devFiles, String path) {
+    private static List<QueuedDevUpload> buildQueueUploadDevFiles(ZipFile otaZip, List<ZipArchiveEntry> devFiles, String path) {
         List<QueuedDevUpload> toReturn = new ArrayList<>();
         for (ZipArchiveEntry devFile : devFiles) {
             // If it starts with /, remove it
-            path = path.startsWith("/") ? path.substring(1) : path;
+            String newPath = path.startsWith("/") ? path.substring(1) : path;
             // If it ends with zip, remove it
-            path = path.endsWith(".zip") ? path.substring(0, path.length() - 4) : path;
+            newPath = newPath.endsWith(".zip") ? newPath.substring(0, newPath.length() - 4) : newPath;
             // Add a / if it doesn't end with one now
-            path = !path.endsWith("/") ? path + "/" : path;
+            newPath = !newPath.endsWith("/") ? newPath + "/" : newPath;
             // Now add the specific file to the path
-            path += devFile.getName();
+            newPath += devFile.getName();
             toReturn.add(new QueuedDevUpload(
-                    otaZip, devFiles, path));
+                    otaZip, devFiles, newPath));
         }
         return toReturn;
     }

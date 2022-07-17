@@ -27,7 +27,6 @@ public class AzureUtils {
     }
 
     public static Response<BlockBlobItem> uploadInputStream(InputStream inputStream, long length, String path) {
-        LOGGER.debug("Starting Azure upload of " + path + ".");
         if (!containerClient.getBlobClient(path).exists()) {
             return containerClient.getBlobClient(path).uploadWithResponse(
                     new BlobParallelUploadOptions(inputStream)
@@ -57,7 +56,7 @@ public class AzureUtils {
         @Override
         public void reportProgress(long bytesTransferred) {
             String percentage = DECIMAL_FORMAT.format((bytesTransferred / length) * 100) + "%";
-            LOGGER.debug("Upload progress for " + name + ": " + percentage);
+            LOGGER.info("Upload progress for " + name + ": " + percentage);
         }
     }
 }
