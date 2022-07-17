@@ -11,18 +11,11 @@ stages:
 - stage: Build
   displayName: Build image
   jobs:
-  - job: Build_Deploy
-    displayName: Build & Deploy
+  - job: Build
+    displayName: Build
     pool:
       vmImage: ubuntu-latest
     steps:
-    - task: SSH@0
-      displayName: Test SSH
-      inputs:
-        sshEndpoint: 'OTA-Live-VM SSH'
-        runOptions: 'commands'
-        commands: 'echo Test'
-        readyTimeout: '20000'
     - task: Docker@2
       displayName: Build image
       inputs:
@@ -35,16 +28,19 @@ stages:
       displayName: Save image to file
       inputs:
         script: 'docker save -o image.tar coocoofroggy/otalive'
-    - task: CopyFilesOverSSH@0
+    - task: PublishBuildArtifacts@1
       inputs:
-        sshEndpoint: 'OTA-Live-VM SSH'
-        contents: 'image.tar'
-        targetFolder: '/tmp/'
-        readyTimeout: '20000'
-        failOnEmptySource: true
-    - task: SSH@0
+        PathtoPublish: 'image.tar'
+        ArtifactName: 'image.tar'
+        publishLocation: 'Container'
+- stage: Deploy
+  displayName: Deploy
+  jobs:
+  - job: Deploy
+    displayName: Deploy
+    pool:
+      name: Default
+    steps:
+    - task: Bash@3
       inputs:
-        sshEndpoint: 'OTA-Live-VM SSH'
-        runOptions: 'script'
-        scriptPath: '~/otaliveupdater.sh'
-        readyTimeout: '20000'
+        filePath: '~/otaliveupdater.sh'
