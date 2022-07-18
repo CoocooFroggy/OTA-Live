@@ -52,19 +52,11 @@ public class TimerUtils {
             LinkedHashMap<String, Integer> initialTitleToDeviceCount = TssUtils.fetchTitleToDeviceCount();
             // Fetch the global object for Discord channels
             GlobalObject globalObject = MongoUtils.fetchGlobalObject();
-
             // Run GDMF scanner
             boolean newAsset = GdmfUtils.runGdmfScanner(globalObject);
-            // Process queued assets
+            // Process new assets: prepare the list of queued uploads.
+            // We upload them after everything is done (at the bottom of this method)
             List<QueuedDevUpload> queuedDevUploads = NewAssetUtils.processQueuedNewAssets();
-            // Upload every new dev file queued, asynchronously
-            new Thread(() -> {
-                try {
-                    uploadEverythingQueued(queuedDevUploads);
-                } catch (InterruptedException e) {
-                    LOGGER.error("Interrupted, unable to upload everything.", e);
-                }
-            }).start();
             // Run TSS scanner
             boolean tssChanged = TssUtils.runTssScanner(globalObject);
             // If something was signed, unsigned, or changed
@@ -74,16 +66,9 @@ public class TimerUtils {
                     LOGGER.info("Running scanners again until everything settles.");
                     // Run GDMF scanner
                     newAsset = GdmfUtils.runGdmfScanner(globalObject);
-                    // Process queued assets
-                    List<QueuedDevUpload> queuedDevUploads1 = NewAssetUtils.processQueuedNewAssets();
-                    // Upload every new dev file queued, asynchronously
-                    new Thread(() -> {
-                        try {
-                            uploadEverythingQueued(queuedDevUploads1);
-                        } catch (InterruptedException e) {
-                            LOGGER.error("Interrupted, unable to upload everything.", e);
-                        }
-                    }).start();
+                    // Process new assets: add to the list of queued uploads.
+                    // We upload them after everything is done (at the bottom of this method)
+                    queuedDevUploads.addAll(NewAssetUtils.processQueuedNewAssets());
                     // Run TSS scanner
                     tssChanged = TssUtils.runTssScanner(globalObject);
                 } while (newAsset || tssChanged);
@@ -93,6 +78,14 @@ public class TimerUtils {
                 TextChannel channel = guild.getTextChannelById(globalObject.getChannelId());
                 channel.sendMessageEmbeds(TssUtils.signedFirmwareEmbed(initialTitleToDeviceCount).build()).queue();
             }
+            // Upload every new dev file queued, asynchronously
+            new Thread(() -> {
+                try {
+                    uploadEverythingQueued(queuedDevUploads);
+                } catch (InterruptedException e) {
+                    LOGGER.error("Interrupted, unable to upload everything.", e);
+                }
+            }).start();
         } catch (Exception e) {
             LOGGER.error("Caught an exception. Finishing loop.", e);
             GdmfUtils.shutdownPresenceMonitor();

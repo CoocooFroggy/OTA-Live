@@ -157,7 +157,7 @@ public class TssUtils {
             completableFutures.add(future);
             // Rate-limit so TSS isn't that mad
             try {
-                Thread.sleep(200);
+                Thread.sleep(100);
             } catch (InterruptedException e) {
                 LOGGER.error("Interrupted sleeping for TSS rate limit.", e);
             }
