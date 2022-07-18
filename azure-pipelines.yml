@@ -41,6 +41,9 @@ stages:
     pool:
       name: Default
     steps:
+    - task: Bash@3
+      inputs:
+        filePath: '/home/coocoofroggy/otalivestopper.sh'
     - task: DownloadBuildArtifacts@0
       inputs:
         buildType: 'current'
