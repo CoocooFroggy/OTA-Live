@@ -23,7 +23,7 @@ stages:
         dockerfile: '$(Build.SourcesDirectory)/Dockerfile'
         repository: coocoofroggy/otalive
         tags: |
-          $(tag)
+          latest
     - task: CmdLine@2
       displayName: Save image to file
       inputs:
