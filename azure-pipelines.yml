@@ -40,6 +40,8 @@ stages:
     displayName: Deploy
     pool:
       name: Default
+      demands:
+      - agent.name -equals OTA-Live-VM
     steps:
     - task: Bash@3
       inputs:
