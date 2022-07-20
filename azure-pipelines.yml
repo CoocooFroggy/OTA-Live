@@ -43,7 +43,8 @@ stages:
     steps:
     - task: Bash@3
       inputs:
-        filePath: '/home/coocoofroggy/otalivestopper.sh'
+        filePath: '/home/coocoofroggy/stopper.sh'
+        arguments: 'coocoofroggy/otalive'
     - task: DownloadBuildArtifacts@0
       inputs:
         buildType: 'current'
