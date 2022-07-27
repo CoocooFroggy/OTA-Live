@@ -317,7 +317,6 @@ public class GdmfUtils {
             }
             // If the response gives us null, retry
             if (suGdmfResponse == null || suGdmfResponse.getAssets() == null) {
-                LOGGER.error("Null for (" + assetAudience + ") for " + device + ".");
                 suAttempts++;
                 // If we hit max attempts, just go on to next asset audience for this device
                 if (suAttempts >= 3) {

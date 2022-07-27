@@ -126,6 +126,8 @@ public class TssUtils {
     }
 
     public static boolean runTssScanner(GlobalObject globalObject) {
+        somethingGotUnsigned = false;
+
         // Update presence every so often
         presenceScheduler = Executors.newScheduledThreadPool(1);
         presenceScheduler.scheduleAtFixedRate(() -> Main.jda.getPresence().setPresence(OnlineStatus.ONLINE,
