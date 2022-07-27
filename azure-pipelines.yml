@@ -23,7 +23,7 @@ stages:
         dockerfile: '$(Build.SourcesDirectory)/Dockerfile'
         repository: coocoofroggy/otalive
         tags: |
-          $(tag)
+          latest
     - task: CmdLine@2
       displayName: Save image to file
       inputs:
@@ -40,7 +40,13 @@ stages:
     displayName: Deploy
     pool:
       name: Default
+      demands:
+      - agent.name -equals OTA-Live-VM
     steps:
+    - task: Bash@3
+      inputs:
+        filePath: '/home/coocoofroggy/stopper.sh'
+        arguments: 'coocoofroggy/otalive'
     - task: DownloadBuildArtifacts@0
       inputs:
         buildType: 'current'
