@@ -279,6 +279,8 @@ public class TssUtils {
         }
         // Check for non-null — null if we're not comparing with any initial
         if (initialTitleToDeviceCount != null) {
+            // Separate latest version from unsigned versions
+            stringBuilder.append("\n");
             // Check if anything was unsigned, and say so
             for (Map.Entry<String, Integer> entry : initialTitleToDeviceCount.entrySet()) {
                 // Skip spacer entries
