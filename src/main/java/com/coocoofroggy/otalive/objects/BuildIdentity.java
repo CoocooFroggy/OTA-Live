@@ -1,8 +1,12 @@
 package com.coocoofroggy.otalive.objects;
 
 import com.coocoofroggy.otalive.objects.gdmf.Asset;
+import org.bson.codecs.pojo.annotations.BsonId;
+import org.bson.types.ObjectId;
 
 public class BuildIdentity {
+    @BsonId
+    private ObjectId id;
     private String buildIdentityB64;
     private boolean signed;
     private String apBoardID;
@@ -29,6 +33,15 @@ public class BuildIdentity {
     public BuildIdentity(String buildIdentityB64) {
         this.buildIdentityB64 = buildIdentityB64;
         this.signed = true;
+    }
+
+    public ObjectId getId() {
+        return id;
+    }
+
+    public BuildIdentity setId(ObjectId id) {
+        this.id = id;
+        return this;
     }
 
     public String getBuildIdentityB64() {

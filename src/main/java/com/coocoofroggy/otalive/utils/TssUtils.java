@@ -205,8 +205,14 @@ public class TssUtils {
 
                         channel.sendMessageEmbeds(embedBuilder.build()).queue();
                     } else if (signingStatus == SigningStatus.UNKNOWN) {
-                        LOGGER.debug("Unknown signing status for " + buildIdentity + ". Likely soft rate-limited. Trying again.");
                         Thread.sleep(500);
+                        // Try again (because of while true loop) but on third try, just quit
+                        if (++attempts > maxAttempts) {
+                            Main.jda.getPresence().setPresence(OnlineStatus.IDLE, null);
+                            LOGGER.error("Unknown signing status for " + buildIdentity + ". Quitting, max attempts was three.");
+                            return;
+                        }
+                        LOGGER.debug("Unknown signing status for " + buildIdentity + ". Likely soft rate-limited. Trying again.");
                         continue;
                     }
                 } catch (IOException | InterruptedException e) {

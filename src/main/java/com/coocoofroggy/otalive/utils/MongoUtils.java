@@ -59,7 +59,7 @@ public class MongoUtils {
     public static void markBuildIdentityAsUnsigned(BuildIdentity buildIdentity) {
         MongoCollection<BuildIdentity> buildIdentitiesCollection = getBuildIdentitiesCollection();
         buildIdentitiesCollection.updateOne(
-                Filters.eq("buildIdentityB64", buildIdentity.getBuildIdentityB64()),
+                Filters.eq(buildIdentity.getId()),
                 Updates.set("signed", false));
     }
 
