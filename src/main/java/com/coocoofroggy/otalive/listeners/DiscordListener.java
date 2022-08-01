@@ -17,8 +17,10 @@ public class DiscordListener extends ListenerAdapter {
     public void onSlashCommandInteraction(@NotNull SlashCommandInteractionEvent event) {
         switch (event.getName()) {
             case "audience" -> {
-                if (!event.getUser().getId().equals("353561670934855681"))
+                if (!event.getUser().getId().equals("353561670934855681")) {
                     event.reply("You must be CoocooFroggy to use commands lol").setEphemeral(true).queue();
+                    return;
+                }
                 assert event.getSubcommandName() != null; // Always has a subcommand
                 switch (event.getSubcommandName()) {
                     case "add" -> {
@@ -55,8 +57,10 @@ public class DiscordListener extends ListenerAdapter {
                 assert event.getSubcommandName() != null; // Always has a subcommand
                 switch (event.getSubcommandName()) {
                     case "force-run" -> {
-                        if (!event.getUser().getId().equals("353561670934855681"))
+                        if (!event.getUser().getId().equals("353561670934855681")) {
                             event.reply("You must be CoocooFroggy to use commands lol").setEphemeral(true).queue();
+                            return;
+                        }
                         event.reply("Running").setEphemeral(true).queue();
                         TimerUtils.scanLoop();
                     }
