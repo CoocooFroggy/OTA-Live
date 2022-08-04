@@ -36,6 +36,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Paths;
 import java.text.DecimalFormat;
 import java.util.ArrayList;
 import java.util.Iterator;
@@ -48,6 +49,7 @@ import java.util.stream.Collectors;
 
 public class GdmfUtils {
     public static final Pattern DEVICE_NAME_PATTERN = Pattern.compile("(.*?)\\d.*");
+    public static final Pattern SPECIAL_CASE_BOARD_ID_PATTERN = Pattern.compile(".*?[.-](.*?)(?:dev|\\.)");
     private static final Gson gson = new Gson();
     private static final Logger LOGGER = LoggerFactory.getLogger(GdmfUtils.class);
     private static final String[] DEV_KEYWORDS = new String[]{
@@ -398,16 +400,23 @@ public class GdmfUtils {
         entryLabel:
         for (Iterator<ZipArchiveEntry> it = otaZip.getEntries().asIterator(); it.hasNext(); ) {
             ZipArchiveEntry entry = it.next();
-            String fileName = entry.getName();
+            String fileName = Paths.get(entry.getName()).getFileName().toString();
             for (String keyword : DEV_KEYWORDS) {
                 // If it's a dev file
                 if (fileName.toLowerCase().contains(keyword)) {
                     // Check for special case
                     for (String s : SPECIAL_CASE) {
-                        if (fileName.contains(s)) {
-                            // Only add it to the list of dev files if it matches our board ID
-                            if (fileName.toLowerCase().contains(boardId.substring(0, 4).toLowerCase()))
-                                devFiles.add(entry);
+                        if (fileName.startsWith(s)) {
+                            // Extract the board ID snippet from file
+                            Matcher matcher = SPECIAL_CASE_BOARD_ID_PATTERN.matcher(fileName.toLowerCase());
+                            if (matcher.find()) {
+                                // Remove the AP from the end of the board ID
+                                String boardIdNoAp = boardId.substring(0, boardId.length() - 2).toLowerCase();
+                                // Only add it to the list of dev files if it matches our board ID
+                                if (boardIdNoAp.equals(matcher.group(1))) {
+                                    devFiles.add(entry);
+                                }
+                            }
                             // It will only match one special case—no need to check others
                             continue entryLabel;
                         }
