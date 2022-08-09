@@ -48,6 +48,7 @@ public class TimerUtils {
      */
     public static void scanLoop() {
         try {
+            boolean sendChangedEmbed = false;
             // Fetch the initial software -> device count before anything is fetched
             LinkedHashMap<String, Integer> initialTitleToDeviceCount = TssUtils.fetchTitleToDeviceCount();
             // Fetch the global object for Discord channels
@@ -57,27 +58,41 @@ public class TimerUtils {
             // Process new assets: prepare the list of queued uploads.
             // We upload them after everything is done (at the bottom of this method)
             List<QueuedDevUpload> queuedDevUploads = NewAssetUtils.processQueuedNewAssets();
-            // Run TSS scanner
-            boolean tssChanged = TssUtils.runTssScanner(globalObject);
-            // If something was signed, unsigned, or changed
-            if (newAsset || tssChanged) {
-                // Keep running the scanners until everything settles
+
+            // If there's a new asset
+            if (newAsset) {
+                sendChangedEmbed = true;
+                // Keep running the GDMF scanner until everything settles
                 do {
-                    LOGGER.info("Running scanners again until everything settles.");
+                    LOGGER.info("Running GDMF scanner again until everything settles.");
                     // Run GDMF scanner
                     newAsset = GdmfUtils.runGdmfScanner(globalObject);
                     // Process new assets: add to the list of queued uploads.
                     // We upload them after everything is done (at the bottom of this method)
                     queuedDevUploads.addAll(NewAssetUtils.processQueuedNewAssets());
+                } while (newAsset);
+            }
+            // Run TSS scanner
+            boolean tssChanged = TssUtils.runTssScanner(globalObject);
+            // If something was unsigned
+            if (tssChanged) {
+                sendChangedEmbed = true;
+                // Keep running the TSS scanner until everything settles
+                do {
+                    LOGGER.info("Running TSS scanner again until everything settles.");
                     // Run TSS scanner
                     tssChanged = TssUtils.runTssScanner(globalObject);
-                } while (newAsset || tssChanged);
+                } while (tssChanged);
+            }
 
-                // Once everything is settled, send the embed with changes
+            // If there's a new asset or something was unsigned
+            if (sendChangedEmbed) {
+                // Once everything is settled, send the embed with the changes
                 Guild guild = Main.jda.getGuildById(globalObject.getGuildId());
                 TextChannel channel = guild.getTextChannelById(globalObject.getChannelId());
                 channel.sendMessageEmbeds(TssUtils.signedFirmwareEmbed(initialTitleToDeviceCount).build()).queue();
             }
+
             // Upload every new dev file queued, asynchronously
             new Thread(() -> {
                 try {
