@@ -6,6 +6,7 @@ import com.coocoofroggy.otalive.utils.TimerUtils;
 import com.coocoofroggy.otalive.utils.TssUtils;
 import net.dv8tion.jda.api.events.interaction.command.SlashCommandInteractionEvent;
 import net.dv8tion.jda.api.hooks.ListenerAdapter;
+import net.dv8tion.jda.api.interactions.InteractionHook;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.List;
@@ -64,7 +65,10 @@ public class DiscordListener extends ListenerAdapter {
                         event.reply("Running").setEphemeral(true).queue();
                         TimerUtils.scanLoop();
                     }
-                    case "signing-status" -> event.replyEmbeds(TssUtils.signedFirmwareEmbed().build()).queue();
+                    case "signing-status" -> {
+                        InteractionHook hook = event.deferReply().complete();
+                        hook.editOriginalEmbeds(TssUtils.signedFirmwareEmbed().build()).queue();
+                    }
                 }
             }
         }
