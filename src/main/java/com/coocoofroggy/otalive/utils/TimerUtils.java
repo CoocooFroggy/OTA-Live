@@ -87,6 +87,17 @@ public class TimerUtils {
 
             // If there's a new asset or something was unsigned
             if (sendChangedEmbed) {
+                // Run the GDMF scanner one more time.
+                // It's really fast, and during TSS checking, new assets could have appeared
+                do {
+                    LOGGER.info("Running GDMF scanner post-TSS until everything settles.");
+                    // Run GDMF scanner
+                    newAsset = GdmfUtils.runGdmfScanner(globalObject);
+                    // Process new assets: add to the list of queued uploads.
+                    // We upload them after everything is done (at the bottom of this method)
+                    queuedDevUploads.addAll(NewAssetUtils.processQueuedNewAssets());
+                } while (newAsset);
+
                 // Once everything is settled, send the embed with the changes
                 Guild guild = Main.jda.getGuildById(globalObject.getGuildId());
                 TextChannel channel = guild.getTextChannelById(globalObject.getChannelId());

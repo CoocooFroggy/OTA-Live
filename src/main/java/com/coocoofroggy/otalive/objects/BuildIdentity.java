@@ -18,6 +18,11 @@ public class BuildIdentity {
     public BuildIdentity() {
     }
 
+    public BuildIdentity(String buildIdentityB64) {
+        this.buildIdentityB64 = buildIdentityB64;
+        this.signed = true;
+    }
+
     @Override
     public String toString() {
         return "BuildIdentity{" +
@@ -28,11 +33,6 @@ public class BuildIdentity {
                 ", apSecurityDomain='" + apSecurityDomain + '\'' +
                 ", asset=" + asset +
                 '}';
-    }
-
-    public BuildIdentity(String buildIdentityB64) {
-        this.buildIdentityB64 = buildIdentityB64;
-        this.signed = true;
     }
 
     public ObjectId getId() {

@@ -4,6 +4,7 @@ import com.coocoofroggy.otalive.Main;
 import com.coocoofroggy.otalive.objects.BuildIdentity;
 import com.coocoofroggy.otalive.objects.GlobalObject;
 import com.coocoofroggy.otalive.objects.SigningStatus;
+import com.coocoofroggy.otalive.objects.embed.VersionCategory;
 import com.coocoofroggy.otalive.objects.gdmf.Asset;
 import com.dd.plist.*;
 import net.dv8tion.jda.api.EmbedBuilder;
@@ -131,8 +132,8 @@ public class TssUtils {
         // Update presence every so often
         presenceScheduler = Executors.newScheduledThreadPool(1);
         presenceScheduler.scheduleAtFixedRate(() -> Main.jda.getPresence().setPresence(OnlineStatus.ONLINE,
-                Activity.playing("Checking TSS... " +
-                        DECIMAL_FORMAT.format((tssProgressCurrent / tssProgressTotal) * 100) + "%")),
+                        Activity.playing("Checking TSS... " +
+                                DECIMAL_FORMAT.format((tssProgressCurrent / tssProgressTotal) * 100) + "%")),
                 0, 5, TimeUnit.SECONDS);
 
         LOGGER.debug("Starting TSS scanner...");
@@ -256,12 +257,12 @@ public class TssUtils {
 
         for (Map.Entry<String, Integer> entry : titleToDeviceCount.entrySet()) {
             // Parse spacer entries
-            if (entry.getValue() <= -1) {
+            if (entry.getValue() == -1) {
                 // Ignore weird OTA versioning
-                if (entry.getKey().startsWith("9.9.")) {
-                    stringBuilder.append("\n**__").append(entry.getKey().substring(4)).append("__**\n");
-                    continue;
-                }
+                stringBuilder.append("\n**__")
+                        .append(entry.getKey().replaceFirst("^9\\.9\\.", ""))
+                        .append("__**\n");
+                continue;
             }
             // Check for non-null — null if we're not comparing with any initial
             if (initialTitleToDeviceCount != null) {
@@ -304,20 +305,30 @@ public class TssUtils {
         List<BuildIdentity> sortedBuildIdentities = fetchSortedBuildIdentities();
         // What we're populating with the loop
         LinkedHashMap<String, Integer> titleToDeviceCount = new LinkedHashMap<>();
-        // Space between versions
-        String previousVersion = "";
+        // Key: CommonVersion (16.0)
+        // Value: List of BuildIdentities
+        TreeMap<String, List<BuildIdentity>> versionCategories = new TreeMap<>();
         for (BuildIdentity buildIdentity : sortedBuildIdentities) {
-            // If it's another version, leave space in between
-            String osVersion = buildIdentity.getAsset().getOsVersion();
-            // If it's another version, leave space in between
-            if (!osVersion.equals(previousVersion)) {
-                titleToDeviceCount.put(osVersion, -1); // -1 means special
+            String commonVersion = buildIdentity.getAsset().getOsVersion().replaceFirst("^9\\.9\\.", "");
+            // Shortcut to add into the List in the HashMap (versionCategories)
+            // https://stackoverflow.com/a/3019388/13668740
+            versionCategories.computeIfAbsent(commonVersion, k -> new ArrayList<>()).add(buildIdentity);
+        }
+        // Loop through these version categories and create
+        // the asset descriptions and device counts
+        for (Map.Entry<String, List<BuildIdentity>> entry : versionCategories.entrySet()) {
+            String version = entry.getKey();
+            // Spacerπ
+            titleToDeviceCount.put(version, -1); // -1 means spacer
+
+            List<BuildIdentity> buildIdentities = entry.getValue();
+            for (BuildIdentity buildIdentity : buildIdentities) {
+                // iOS 16 Developer Beta 2 (`18A24`)
+                String key = buildIdentity.getAsset().getHumanReadableName() + " (`" + buildIdentity.getAsset().getBuildId() + "`)";
+                Integer count = titleToDeviceCount.get(key);
+                if (count == null) count = 0;
+                titleToDeviceCount.put(key, count + 1);
             }
-            // iOS 16 Developer Beta 2 (`18A24`)
-            String key = buildIdentity.getAsset().getHumanReadableName() + " (`" + buildIdentity.getAsset().getBuildId() + "`)";
-            Integer count = titleToDeviceCount.get(key);
-            if (count == null) count = 0;
-            titleToDeviceCount.put(key, count + 1);
         }
         return titleToDeviceCount;
     }
@@ -325,8 +336,8 @@ public class TssUtils {
     @NotNull
     private static List<BuildIdentity> fetchSortedBuildIdentities() {
         List<BuildIdentity> buildIdentities = MongoUtils.fetchAllSignedBuildIdentities();
-        // Sort this by OS version
-        buildIdentities.sort(Comparator.comparing(o -> o.getAsset().getOsVersion()));
+        // Sort this by Build ID
+        buildIdentities.sort(Comparator.comparing(o -> o.getAsset().getBuildId()));
         return buildIdentities; // Now sorted
     }
 }
