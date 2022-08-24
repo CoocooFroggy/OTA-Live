@@ -43,6 +43,7 @@ stages:
       demands:
       - agent.name -equals OTA-Live-VM
     steps:
+    - checkout: none
     - task: Bash@3
       inputs:
         filePath: '/home/coocoofroggy/stopper.sh'
