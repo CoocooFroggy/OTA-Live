@@ -3,12 +3,10 @@ package com.coocoofroggy.otalive.objects;
 import org.apache.commons.compress.archivers.zip.ZipArchiveEntry;
 import org.apache.commons.compress.archivers.zip.ZipFile;
 
-import java.util.List;
-
 public class QueuedDevUpload {
-    ZipFile otaZip;
-    ZipArchiveEntry devFile;
-    String path;
+    final ZipFile otaZip;
+    final ZipArchiveEntry devFile;
+    final String path;
 
     public QueuedDevUpload(ZipFile otaZip, ZipArchiveEntry devFile, String path) {
         this.otaZip = otaZip;

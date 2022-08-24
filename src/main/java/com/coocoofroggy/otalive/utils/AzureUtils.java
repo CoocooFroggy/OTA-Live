@@ -9,7 +9,6 @@ import com.azure.storage.blob.models.AccessTier;
 import com.azure.storage.blob.models.BlobRequestConditions;
 import com.azure.storage.blob.models.BlockBlobItem;
 import com.azure.storage.blob.models.ParallelTransferOptions;
-import com.azure.storage.blob.options.BlobContainerCreateOptions;
 import com.azure.storage.blob.options.BlobParallelUploadOptions;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -46,8 +45,8 @@ public class AzureUtils {
     static class UploadReporter implements ProgressReceiver {
         private static final DecimalFormat DECIMAL_FORMAT = new DecimalFormat("0.00");
 
-        String name;
-        long length;
+        final String name;
+        final long length;
 
         public UploadReporter(String name, long length) {
             this.name = name;
