@@ -5,8 +5,10 @@ import com.coocoofroggy.otalive.objects.BuildIdentity;
 import com.coocoofroggy.otalive.objects.GlobalObject;
 import com.coocoofroggy.otalive.objects.QueuedDevUpload;
 import com.coocoofroggy.otalive.objects.gdmf.Asset;
+import com.coocoofroggy.otalive.objects.gdmf.DocumentationBundle;
 import com.coocoofroggy.otalive.objects.gdmf.GdmfResponse;
 import com.dd.plist.NSDictionary;
+import com.dd.plist.PropertyListFormatException;
 import com.dd.plist.PropertyListParser;
 import com.google.gson.Gson;
 import com.google.gson.JsonSyntaxException;
@@ -16,6 +18,7 @@ import net.dv8tion.jda.api.entities.Activity;
 import net.dv8tion.jda.api.entities.Guild;
 import net.dv8tion.jda.api.entities.Message;
 import net.dv8tion.jda.api.entities.TextChannel;
+import net.dv8tion.jda.api.requests.restaction.MessageAction;
 import org.apache.commons.codec.binary.Base64;
 import org.apache.commons.compress.archivers.zip.ZipArchiveEntry;
 import org.apache.commons.compress.archivers.zip.ZipFile;
@@ -30,7 +33,9 @@ import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.xml.sax.SAXException;
 
+import javax.xml.parsers.ParserConfigurationException;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
@@ -38,6 +43,7 @@ import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Paths;
 import java.text.DecimalFormat;
+import java.text.ParseException;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
@@ -176,9 +182,9 @@ public class GdmfUtils {
                                             if (docGdmfResponse == null) break;
 
                                             // Not iterating through assets because there should not be multiple documentations. Just use the first.
-                                            // Get human-readable name
-                                            asset.setHumanReadableName(
-                                                    humanReadableFromDocUrl(docGdmfResponse.getAssets().get(0).getFullUrl()));
+                                            // Get human-readable name and optional image
+                                            DocumentationBundle documentationBundle = fetchDocumentationDataFromUrl(docGdmfResponse.getAssets().get(0).getFullUrl());
+                                            asset.setHumanReadableName(documentationBundle.getHumanReadableUpdateName());
 
                                             EmbedBuilder embedBuilder = new EmbedBuilder();
                                             // iOS16Beta2 — iPhone11,8
@@ -187,10 +193,8 @@ public class GdmfUtils {
                                                     .addField("OS Version", asset.getOsVersion(), true)
                                                     .addField("SU Documentation ID", asset.getSuDocumentationId(), true)
                                                     .addField("Device Name", deviceHumanName, true)
-                                                    .addField("URL", asset.getFullUrl(), false);
-
-                                            // Send initial message
-                                            Message message = channel.sendMessageEmbeds(embedBuilder.build()).complete();
+                                                    .addField("URL", asset.getFullUrl(), false)
+                                                    .setThumbnail("attachment://image.png");
 
                                             // Scan for dev files
                                             // Makes a remote zip from URL
@@ -208,8 +212,14 @@ public class GdmfUtils {
                                             // Close it
                                             otaZip.close();
 
-                                            // Update the message
-                                            message.editMessageEmbeds(embedBuilder.build()).queue();
+                                            // Send the message
+                                            MessageAction messageAction = channel.sendMessageEmbeds(embedBuilder.build());
+                                            // If there's an image, add it
+                                            if (documentationBundle.getPrefsImage() != null) {
+                                                //noinspection ResultOfMethodCallIgnored
+                                                messageAction.addFile(documentationBundle.getPrefsImage(), "image.png");
+                                            }
+                                            Message message = messageAction.complete();
 
                                             // Get BuildIdentity data for TSS
                                             BuildIdentity buildIdentity = TssUtils.buildIdentityFromUrl(asset.getFullUrl(), boardId);
@@ -460,9 +470,15 @@ public class GdmfUtils {
     }
     //endregion
 
-    public static String humanReadableFromDocUrl(String urlString) throws Exception {
+    // region Documentation
+
+    public static DocumentationBundle fetchDocumentationDataFromUrl(String urlString) throws Exception {
         URL url = new URL(urlString);
         ZipFile otaZip = new ZipFile(new HttpChannel(url), "Documentation: " + urlString, StandardCharsets.UTF_8.name(), true, true);
+        return new DocumentationBundle(humanReadableFromZipFile(otaZip), prefsImageFromZipFile(otaZip));
+    }
+
+    private static String humanReadableFromZipFile(ZipFile otaZip) throws IOException, PropertyListFormatException, ParseException, ParserConfigurationException, SAXException {
         ZipArchiveEntry documentationEntry = otaZip.getEntry("AssetData/en.lproj/documentation.strings");
         InputStream inputStream = otaZip.getInputStream(documentationEntry);
 
@@ -470,5 +486,20 @@ public class GdmfUtils {
         otaZip.close();
         return rootDict.objectForKey("HumanReadableUpdateName").toString();
     }
+
+    public static InputStream prefsImageFromZipFile(ZipFile otaZip) throws Exception {
+        for (Iterator<ZipArchiveEntry> it = otaZip.getEntries().asIterator(); it.hasNext(); ) {
+            ZipArchiveEntry entry = it.next();
+            String fileName = Paths.get(entry.getName()).getFileName().toString();
+            if (fileName.startsWith("PreferencesIcon")) {
+                otaZip.close();
+                return otaZip.getInputStream(entry);
+            }
+        }
+        otaZip.close();
+        return null;
+    }
+
+    // endregion
 
 }
