@@ -223,6 +223,7 @@ public class GdmfUtils {
                                                 //noinspection ResultOfMethodCallIgnored
                                                 messageAction.addFile(documentationBundle.getPrefsImage(), "image.png");
                                             }
+                                            // TODO: Add a button that opens the full readme (or sends an attachment with it)
                                             Message message = messageAction.complete();
 
                                             // Get BuildIdentity data for TSS
