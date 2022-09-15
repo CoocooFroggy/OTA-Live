@@ -186,6 +186,7 @@ public class GdmfUtils {
                                             // Get human-readable name and optional image
                                             DocumentationBundle documentationBundle = fetchDocumentationDataFromUrl(docGdmfResponse.getAssets().get(0).getFullUrl());
                                             asset.setHumanReadableName(documentationBundle.getHumanReadableUpdateName());
+                                            asset.setReadMeSummary(documentationBundle.getReadMeSummary());
 
                                             EmbedBuilder embedBuilder = new EmbedBuilder();
                                             // iOS16Beta2 — iPhone11,8
@@ -195,6 +196,8 @@ public class GdmfUtils {
                                                     .addField("SU Documentation ID", asset.getSuDocumentationId(), true)
                                                     .addField("Device Name", deviceHumanName, true)
                                                     .addField("URL", asset.getFullUrl(), false)
+                                                    .addField("Summary", asset.getReadMeSummary(), false)
+                                                    // Image uploaded later
                                                     .setThumbnail("attachment://image.png");
 
                                             // Scan for dev files
