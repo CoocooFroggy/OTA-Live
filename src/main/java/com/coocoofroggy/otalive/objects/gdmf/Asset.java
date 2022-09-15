@@ -22,7 +22,8 @@ public class Asset {
 
     // Our own
     private String humanReadableName;
-    private String readMeSummary;
+    private String readMeSummaryMd;
+    private String readMeFullHtml;
 
     public Asset() {
     }
@@ -60,7 +61,8 @@ public class Asset {
                 ", suDocumentationId='" + suDocumentationId + '\'' +
                 ", supportedDevices=" + supportedDevices +
                 ", humanReadableName='" + humanReadableName + '\'' +
-                ", readMeSummary='" + readMeSummary + '\'' +
+                ", readMeSummaryMd='" + readMeSummaryMd + '\'' +
+                ", readMeFullHtml='" + readMeFullHtml + '\'' +
                 '}';
     }
 
@@ -135,11 +137,20 @@ public class Asset {
         return this;
     }
 
-    public String getReadMeSummary() {
-        return readMeSummary;
+    public String getReadMeSummaryMd() {
+        return readMeSummaryMd;
     }
 
-    public void setReadMeSummary(String readMeSummary) {
-        this.readMeSummary = readMeSummary;
+    public void setReadMeSummaryMd(String readMeSummaryMd) {
+        this.readMeSummaryMd = readMeSummaryMd;
+    }
+
+    public String getReadMeFullHtml() {
+        return readMeFullHtml;
+    }
+
+    public Asset setReadMeFullHtml(String readMeFullHtml) {
+        this.readMeFullHtml = readMeFullHtml;
+        return this;
     }
 }

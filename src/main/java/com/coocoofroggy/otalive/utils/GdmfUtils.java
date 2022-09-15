@@ -184,9 +184,10 @@ public class GdmfUtils {
 
                                             // Not iterating through assets because there should not be multiple documentations. Just use the first.
                                             // Get human-readable name and optional image
-                                            DocumentationBundle documentationBundle = fetchDocumentationDataFromUrl(docGdmfResponse.getAssets().get(0).getFullUrl());
+                                            DocumentationBundle documentationBundle = fetchDocumentationBundleFromUrl(docGdmfResponse.getAssets().get(0).getFullUrl());
                                             asset.setHumanReadableName(documentationBundle.getHumanReadableUpdateName());
-                                            asset.setReadMeSummary(documentationBundle.getReadMeSummary());
+                                            asset.setReadMeSummaryMd(documentationBundle.getReadMeSummaryMd());
+                                            asset.setReadMeFullHtml(documentationBundle.getReadMeFullHtml());
 
                                             EmbedBuilder embedBuilder = new EmbedBuilder();
                                             // iOS16Beta2 — iPhone11,8
@@ -196,7 +197,7 @@ public class GdmfUtils {
                                                     .addField("SU Documentation ID", asset.getSuDocumentationId(), true)
                                                     .addField("Device Name", deviceHumanName, true)
                                                     .addField("URL", asset.getFullUrl(), false)
-                                                    .addField("Summary", asset.getReadMeSummary(), false)
+                                                    .addField("Summary", asset.getReadMeSummaryMd(), false)
                                                     // Image uploaded later
                                                     .setThumbnail("attachment://image.png");
 
@@ -223,7 +224,10 @@ public class GdmfUtils {
                                                 //noinspection ResultOfMethodCallIgnored
                                                 messageAction.addFile(documentationBundle.getPrefsImage(), "image.png");
                                             }
-                                            // TODO: Add a button that opens the full readme (or sends an attachment with it)
+                                            if (asset.getReadMeFullHtml() != null) {
+                                                //noinspection ResultOfMethodCallIgnored
+                                                messageAction.addFile(IOUtils.toInputStream(asset.getReadMeFullHtml(), StandardCharsets.UTF_8), "Patch Notes.html");
+                                            }
                                             Message message = messageAction.complete();
 
                                             // Get BuildIdentity data for TSS
@@ -477,13 +481,14 @@ public class GdmfUtils {
 
     // region Documentation
 
-    public static DocumentationBundle fetchDocumentationDataFromUrl(String urlString) throws Exception {
+    public static DocumentationBundle fetchDocumentationBundleFromUrl(String urlString) throws Exception {
         URL url = new URL(urlString);
         ZipFile otaZip = new ZipFile(new HttpChannel(url), "Documentation: " + urlString, StandardCharsets.UTF_8.name(), true, true);
         DocumentationBundle bundle = new DocumentationBundle(
                 humanReadableFromZipFile(otaZip),
                 prefsImageFromZipFile(otaZip),
-                readMeSummaryFromZipFile(otaZip));
+                readMeSummaryFromZipFile(otaZip),
+                readMeFullFromZipFile(otaZip));
         otaZip.close();
         return bundle;
     }
@@ -515,6 +520,17 @@ public class GdmfUtils {
                 String html = IOUtils.toString(inputStream, StandardCharsets.UTF_8);
                 CopyDown converter = new CopyDown();
                 return converter.convert(html);
+            }
+        }
+        return null;
+    }
+
+    public static String readMeFullFromZipFile(ZipFile otaZip) throws Exception {
+        for (Iterator<ZipArchiveEntry> it = otaZip.getEntries().asIterator(); it.hasNext(); ) {
+            ZipArchiveEntry entry = it.next();
+            if (entry.getName().equals("AssetData/en.lproj/ReadMe.html")) {
+                InputStream inputStream = otaZip.getInputStream(entry);
+                return IOUtils.toString(inputStream, StandardCharsets.UTF_8);
             }
         }
         return null;
