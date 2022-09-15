@@ -22,6 +22,8 @@ public class Asset {
 
     // Our own
     private String humanReadableName;
+    private String readMeSummaryMd;
+    private String readMeFullHtml;
 
     public Asset() {
     }
@@ -46,7 +48,7 @@ public class Asset {
                 && Objects.equals(buildId, asset.buildId)
                 && Objects.equals(suDocumentationId, asset.suDocumentationId)
                 && Objects.equals(supportedDevices, asset.supportedDevices);
-        // We don't check humanReadableName because one of the assets may not have fetched it yet
+        // We don't check documentation because one of the assets may not have fetched it yet
     }
 
     @Override
@@ -59,6 +61,8 @@ public class Asset {
                 ", suDocumentationId='" + suDocumentationId + '\'' +
                 ", supportedDevices=" + supportedDevices +
                 ", humanReadableName='" + humanReadableName + '\'' +
+                ", readMeSummaryMd='" + readMeSummaryMd + '\'' +
+                ", readMeFullHtml='" + readMeFullHtml + '\'' +
                 '}';
     }
 
@@ -130,6 +134,23 @@ public class Asset {
 
     public Asset setHumanReadableName(String humanReadableName) {
         this.humanReadableName = humanReadableName;
+        return this;
+    }
+
+    public String getReadMeSummaryMd() {
+        return readMeSummaryMd;
+    }
+
+    public void setReadMeSummaryMd(String readMeSummaryMd) {
+        this.readMeSummaryMd = readMeSummaryMd;
+    }
+
+    public String getReadMeFullHtml() {
+        return readMeFullHtml;
+    }
+
+    public Asset setReadMeFullHtml(String readMeFullHtml) {
+        this.readMeFullHtml = readMeFullHtml;
         return this;
     }
 }

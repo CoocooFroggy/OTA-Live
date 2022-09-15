@@ -12,6 +12,7 @@ import com.dd.plist.PropertyListFormatException;
 import com.dd.plist.PropertyListParser;
 import com.google.gson.Gson;
 import com.google.gson.JsonSyntaxException;
+import io.github.furstenheim.CopyDown;
 import net.dv8tion.jda.api.EmbedBuilder;
 import net.dv8tion.jda.api.OnlineStatus;
 import net.dv8tion.jda.api.entities.Activity;
@@ -183,8 +184,10 @@ public class GdmfUtils {
 
                                             // Not iterating through assets because there should not be multiple documentations. Just use the first.
                                             // Get human-readable name and optional image
-                                            DocumentationBundle documentationBundle = fetchDocumentationDataFromUrl(docGdmfResponse.getAssets().get(0).getFullUrl());
+                                            DocumentationBundle documentationBundle = fetchDocumentationBundleFromUrl(docGdmfResponse.getAssets().get(0).getFullUrl());
                                             asset.setHumanReadableName(documentationBundle.getHumanReadableUpdateName());
+                                            asset.setReadMeSummaryMd(documentationBundle.getReadMeSummaryMd());
+                                            asset.setReadMeFullHtml(documentationBundle.getReadMeFullHtml());
 
                                             EmbedBuilder embedBuilder = new EmbedBuilder();
                                             // iOS16Beta2 — iPhone11,8
@@ -194,6 +197,8 @@ public class GdmfUtils {
                                                     .addField("SU Documentation ID", asset.getSuDocumentationId(), true)
                                                     .addField("Device Name", deviceHumanName, true)
                                                     .addField("URL", asset.getFullUrl(), false)
+                                                    .addField("Summary", asset.getReadMeSummaryMd(), false)
+                                                    // Image uploaded later
                                                     .setThumbnail("attachment://image.png");
 
                                             // Scan for dev files
@@ -218,6 +223,10 @@ public class GdmfUtils {
                                             if (documentationBundle.getPrefsImage() != null) {
                                                 //noinspection ResultOfMethodCallIgnored
                                                 messageAction.addFile(documentationBundle.getPrefsImage(), "image.png");
+                                            }
+                                            if (asset.getReadMeFullHtml() != null) {
+                                                //noinspection ResultOfMethodCallIgnored
+                                                messageAction.addFile(IOUtils.toInputStream(asset.getReadMeFullHtml(), StandardCharsets.UTF_8), "Patch Notes.html");
                                             }
                                             Message message = messageAction.complete();
 
@@ -472,10 +481,16 @@ public class GdmfUtils {
 
     // region Documentation
 
-    public static DocumentationBundle fetchDocumentationDataFromUrl(String urlString) throws Exception {
+    public static DocumentationBundle fetchDocumentationBundleFromUrl(String urlString) throws Exception {
         URL url = new URL(urlString);
         ZipFile otaZip = new ZipFile(new HttpChannel(url), "Documentation: " + urlString, StandardCharsets.UTF_8.name(), true, true);
-        return new DocumentationBundle(humanReadableFromZipFile(otaZip), prefsImageFromZipFile(otaZip));
+        DocumentationBundle bundle = new DocumentationBundle(
+                humanReadableFromZipFile(otaZip),
+                prefsImageFromZipFile(otaZip),
+                readMeSummaryFromZipFile(otaZip),
+                readMeFullFromZipFile(otaZip));
+        otaZip.close();
+        return bundle;
     }
 
     private static String humanReadableFromZipFile(ZipFile otaZip) throws IOException, PropertyListFormatException, ParseException, ParserConfigurationException, SAXException {
@@ -483,7 +498,6 @@ public class GdmfUtils {
         InputStream inputStream = otaZip.getInputStream(documentationEntry);
 
         NSDictionary rootDict = (NSDictionary) PropertyListParser.parse(inputStream);
-        otaZip.close();
         return rootDict.objectForKey("HumanReadableUpdateName").toString();
     }
 
@@ -492,11 +506,33 @@ public class GdmfUtils {
             ZipArchiveEntry entry = it.next();
             String fileName = Paths.get(entry.getName()).getFileName().toString();
             if (fileName.startsWith("PreferencesIcon")) {
-                otaZip.close();
                 return otaZip.getInputStream(entry);
             }
         }
-        otaZip.close();
+        return null;
+    }
+
+    public static String readMeSummaryFromZipFile(ZipFile otaZip) throws Exception {
+        for (Iterator<ZipArchiveEntry> it = otaZip.getEntries().asIterator(); it.hasNext(); ) {
+            ZipArchiveEntry entry = it.next();
+            if (entry.getName().equals("AssetData/en.lproj/ReadMeSummary.html")) {
+                InputStream inputStream = otaZip.getInputStream(entry);
+                String html = IOUtils.toString(inputStream, StandardCharsets.UTF_8);
+                CopyDown converter = new CopyDown();
+                return converter.convert(html);
+            }
+        }
+        return null;
+    }
+
+    public static String readMeFullFromZipFile(ZipFile otaZip) throws Exception {
+        for (Iterator<ZipArchiveEntry> it = otaZip.getEntries().asIterator(); it.hasNext(); ) {
+            ZipArchiveEntry entry = it.next();
+            if (entry.getName().equals("AssetData/en.lproj/ReadMe.html")) {
+                InputStream inputStream = otaZip.getInputStream(entry);
+                return IOUtils.toString(inputStream, StandardCharsets.UTF_8);
+            }
+        }
         return null;
     }
 
