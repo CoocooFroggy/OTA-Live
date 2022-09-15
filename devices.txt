@@ -39,6 +39,10 @@ iPhone14,3;D64AP;iPhone 13 Pro Max
 iPhone14,4;D16AP;iPhone 13 mini
 iPhone14,5;D17AP;iPhone 13
 iPhone14,6;D49AP;iPhone SE 3
+iPhone14,7;D27AP;iPhone 14
+iPhone14,8;D28AP;iPhone 14 Plus
+iPhone15,2;D73AP;iPhone 14 Pro
+iPhone15,3;D74AP;iPhone 14 Pro Max
 
 iPod7,1;N102AP;iPod touch 6
 iPod9,1;N112AP;iPod touch 7
