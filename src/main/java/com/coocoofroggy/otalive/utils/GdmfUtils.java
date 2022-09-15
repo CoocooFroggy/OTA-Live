@@ -12,6 +12,7 @@ import com.dd.plist.PropertyListFormatException;
 import com.dd.plist.PropertyListParser;
 import com.google.gson.Gson;
 import com.google.gson.JsonSyntaxException;
+import io.github.furstenheim.CopyDown;
 import net.dv8tion.jda.api.EmbedBuilder;
 import net.dv8tion.jda.api.OnlineStatus;
 import net.dv8tion.jda.api.entities.Activity;
@@ -475,7 +476,12 @@ public class GdmfUtils {
     public static DocumentationBundle fetchDocumentationDataFromUrl(String urlString) throws Exception {
         URL url = new URL(urlString);
         ZipFile otaZip = new ZipFile(new HttpChannel(url), "Documentation: " + urlString, StandardCharsets.UTF_8.name(), true, true);
-        return new DocumentationBundle(humanReadableFromZipFile(otaZip), prefsImageFromZipFile(otaZip));
+        DocumentationBundle bundle = new DocumentationBundle(
+                humanReadableFromZipFile(otaZip),
+                prefsImageFromZipFile(otaZip),
+                readMeSummaryFromZipFile(otaZip));
+        otaZip.close();
+        return bundle;
     }
 
     private static String humanReadableFromZipFile(ZipFile otaZip) throws IOException, PropertyListFormatException, ParseException, ParserConfigurationException, SAXException {
@@ -483,7 +489,6 @@ public class GdmfUtils {
         InputStream inputStream = otaZip.getInputStream(documentationEntry);
 
         NSDictionary rootDict = (NSDictionary) PropertyListParser.parse(inputStream);
-        otaZip.close();
         return rootDict.objectForKey("HumanReadableUpdateName").toString();
     }
 
@@ -492,11 +497,22 @@ public class GdmfUtils {
             ZipArchiveEntry entry = it.next();
             String fileName = Paths.get(entry.getName()).getFileName().toString();
             if (fileName.startsWith("PreferencesIcon")) {
-                otaZip.close();
                 return otaZip.getInputStream(entry);
             }
         }
-        otaZip.close();
+        return null;
+    }
+
+    public static String readMeSummaryFromZipFile(ZipFile otaZip) throws Exception {
+        for (Iterator<ZipArchiveEntry> it = otaZip.getEntries().asIterator(); it.hasNext(); ) {
+            ZipArchiveEntry entry = it.next();
+            if (entry.getName().equals("AssetData/en.lproj/ReadMeSummary.html")) {
+                InputStream inputStream = otaZip.getInputStream(entry);
+                String html = IOUtils.toString(inputStream, StandardCharsets.UTF_8);
+                CopyDown converter = new CopyDown();
+                return converter.convert(html);
+            }
+        }
         return null;
     }
 
