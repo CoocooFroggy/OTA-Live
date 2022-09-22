@@ -4,11 +4,14 @@ import com.coocoofroggy.otalive.objects.GlobalObject;
 import com.coocoofroggy.otalive.utils.MongoUtils;
 import com.coocoofroggy.otalive.utils.TimerUtils;
 import com.coocoofroggy.otalive.utils.TssUtils;
+import net.dv8tion.jda.api.EmbedBuilder;
+import net.dv8tion.jda.api.entities.MessageEmbed;
 import net.dv8tion.jda.api.events.interaction.command.SlashCommandInteractionEvent;
 import net.dv8tion.jda.api.hooks.ListenerAdapter;
 import net.dv8tion.jda.api.interactions.InteractionHook;
 import org.jetbrains.annotations.NotNull;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import java.util.stream.Collectors;
@@ -67,7 +70,19 @@ public class DiscordListener extends ListenerAdapter {
                     }
                     case "signing-status" -> {
                         InteractionHook hook = event.deferReply().complete();
-                        hook.editOriginalEmbeds(TssUtils.signedFirmwareEmbed().build()).queue();
+                        // All embeds (could be > 10)
+                        List<EmbedBuilder> firmwareEmbeds = TssUtils.firmwareEmbeds();
+                        // Queued embeds to send in groups of 10
+                        List<MessageEmbed> queuedEmbeds = new ArrayList<>();
+                        for (int i = 0; i < firmwareEmbeds.size(); i++) {
+                            if (i % 10 == 0 && i != 0) {
+                                hook.sendMessageEmbeds(queuedEmbeds).queue();
+                                queuedEmbeds = new ArrayList<>();
+                            }
+                            queuedEmbeds.add(firmwareEmbeds.get(i).build());
+                        }
+                        if (!queuedEmbeds.isEmpty())
+                            hook.sendMessageEmbeds(queuedEmbeds).queue();
                     }
                 }
             }
