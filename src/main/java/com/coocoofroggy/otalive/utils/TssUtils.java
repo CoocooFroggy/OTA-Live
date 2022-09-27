@@ -303,6 +303,7 @@ public class TssUtils {
 
         // Check for non-null — null if we're not comparing with any initial
         if (initialTitleToDeviceCount != null) {
+            stringBuilder = new StringBuilder();
             // Check if anything was unsigned, and say so
             boolean somethingWasUnsigned = false;
             for (Map.Entry<String, Integer> entry : initialTitleToDeviceCount.entrySet()) {
@@ -315,7 +316,6 @@ public class TssUtils {
                 }
             }
             if (somethingWasUnsigned) {
-                stringBuilder = new StringBuilder();
                 embedBuilder = new EmbedBuilder()
                         .setTitle("Unsigned")
                         .setColor(new Color(0xB00000))
