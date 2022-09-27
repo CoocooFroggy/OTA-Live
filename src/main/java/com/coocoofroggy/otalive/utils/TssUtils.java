@@ -208,7 +208,6 @@ public class TssUtils {
                         Thread.sleep(500);
                         // Try again (because of while true loop) but on third try, just quit
                         if (++attempts > maxAttempts) {
-                            Main.jda.getPresence().setPresence(OnlineStatus.IDLE, null);
                             LOGGER.error("Unknown signing status for " + buildIdentity + ". Quitting, max attempts was three.");
                             return;
                         }
@@ -218,7 +217,6 @@ public class TssUtils {
                 } catch (IOException | InterruptedException e) {
                     // Try again (because of while true loop) but on third try, just quit
                     if (++attempts > maxAttempts) {
-                        Main.jda.getPresence().setPresence(OnlineStatus.IDLE, null);
                         LOGGER.error("Caught exception. Quitting, max attempts was three.");
                         throw new RuntimeException(e);
                     }
