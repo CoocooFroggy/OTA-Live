@@ -250,7 +250,6 @@ public class GdmfUtils {
                                         } catch (Exception e) {
                                             // Try again (because of while true loop) but on third try, just quit
                                             if (++attempts1 > maxAttempts1) {
-                                                Main.jda.getPresence().setPresence(OnlineStatus.IDLE, null);
                                                 LOGGER.error("Caught exception. Quitting, max attempts was three.");
                                                 throw new RuntimeException(e);
                                             }
@@ -269,7 +268,6 @@ public class GdmfUtils {
                 } catch (Exception e) {
                     // Try again (because of while true loop) but on third try, just quit
                     if (++attempts > maxAttempts) {
-                        Main.jda.getPresence().setPresence(OnlineStatus.IDLE, null);
                         LOGGER.error("Caught exception. Quitting, max attempts was three.");
                         throw new RuntimeException(e);
                     }
