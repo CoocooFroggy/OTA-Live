@@ -244,23 +244,40 @@ public class TssUtils {
         }
     }
 
-    public static EmbedBuilder signedFirmwareEmbed() {
-        return signedFirmwareEmbed(null);
+    public static List<EmbedBuilder> firmwareEmbeds() {
+        return firmwareEmbeds(null);
     }
 
     // This one compares it to the initial one
-    public static EmbedBuilder signedFirmwareEmbed(LinkedHashMap<String, Integer> initialTitleToDeviceCount) {
+    public static List<EmbedBuilder> firmwareEmbeds(LinkedHashMap<String, Integer> initialTitleToDeviceCount) {
         LinkedHashMap<String, Integer> titleToDeviceCount = fetchTitleToDeviceCount();
 
-        StringBuilder stringBuilder = new StringBuilder();
+        List<EmbedBuilder> embedsToSend = new ArrayList<>();
 
-        for (Map.Entry<String, Integer> entry : titleToDeviceCount.entrySet()) {
+        StringBuilder stringBuilder = new StringBuilder();
+        EmbedBuilder embedBuilder = new EmbedBuilder()
+                .setColor(new Color(0x38C700));
+
+        boolean initialRun = true;
+        Iterator<Map.Entry<String, Integer>> iterator = titleToDeviceCount.entrySet().iterator();
+        while (iterator.hasNext()) {
+            Map.Entry<String, Integer> entry = iterator.next();
             // Parse spacer entries
             if (entry.getValue() == -1) {
+                // If it's ≥ the 2nd embed, finish up the old one and make a new one
+                if (!initialRun) {
+                    // Tidy up and add to list
+                    embedBuilder.setDescription(stringBuilder);
+                    embedsToSend.add(embedBuilder);
+                    // Reset variables for next one
+                    stringBuilder = new StringBuilder();
+                    embedBuilder = new EmbedBuilder().setColor(new Color(0x38C700));
+                } else {
+                    initialRun = false;
+                }
+
                 // Ignore weird OTA versioning
-                stringBuilder.append("\n**__")
-                        .append(entry.getKey().replaceFirst("^9\\.9\\.", ""))
-                        .append("__**\n");
+                embedBuilder.setTitle(entry.getKey().replaceFirst("^9\\.9\\.", ""));
                 continue;
             }
             // Check for non-null — null if we're not comparing with any initial
@@ -276,27 +293,38 @@ public class TssUtils {
             }
             // iOS 16 Developer Beta 2 (`18A24`): 5 devices.
             stringBuilder.append(entry.getKey()).append(": ").append(entry.getValue()).append(" devices.\n");
-        }
-        // Check for non-null — null if we're not comparing with any initial
-        if (initialTitleToDeviceCount != null) {
-            // Separate latest version from unsigned versions
-            stringBuilder.append("\n");
-            // Check if anything was unsigned, and say so
-            for (Map.Entry<String, Integer> entry : initialTitleToDeviceCount.entrySet()) {
-                // Skip spacer entries
-                if (entry.getValue() <= -1) continue;
-                // If the current buildIdSignedDevicesCount doesn't have a key that was there initially, it got unsigned
-                if (!titleToDeviceCount.containsKey(entry.getKey()))
-                    stringBuilder.append("**UNSIGNED →** ").append(entry.getKey()).append(": ").append(entry.getValue()).append(" devices.\n");
+
+            // After the last entry, finish up this embed
+            if (!iterator.hasNext()) {
+                embedBuilder.setDescription(stringBuilder);
+                embedsToSend.add(embedBuilder);
             }
         }
 
-        EmbedBuilder embedBuilder = new EmbedBuilder();
-        embedBuilder.setTitle("Signed OTAs")
-                .setColor(new Color(0x38C700))
-                .setDescription(stringBuilder.toString());
+        // Check for non-null — null if we're not comparing with any initial
+        if (initialTitleToDeviceCount != null) {
+            // Check if anything was unsigned, and say so
+            boolean somethingWasUnsigned = false;
+            for (Map.Entry<String, Integer> entry : initialTitleToDeviceCount.entrySet()) {
+                // Skip spacer entries
+                if (entry.getValue() <= -1) continue;
+                // If the current titleToDeviceCount doesn't have a key that was there initially, it got unsigned
+                if (!titleToDeviceCount.containsKey(entry.getKey())) {
+                    somethingWasUnsigned = true;
+                    stringBuilder.append("**UNSIGNED →** ").append(entry.getKey()).append(": ").append(entry.getValue()).append(" devices.\n");
+                }
+            }
+            if (somethingWasUnsigned) {
+                stringBuilder = new StringBuilder();
+                embedBuilder = new EmbedBuilder()
+                        .setTitle("Unsigned")
+                        .setColor(new Color(0xB00000))
+                        .setDescription(stringBuilder);
+                embedsToSend.add(embedBuilder);
+            }
+        }
 
-        return embedBuilder;
+        return embedsToSend;
     }
 
     @NotNull

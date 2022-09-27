@@ -5,7 +5,9 @@ import com.azure.storage.blob.models.BlockBlobItem;
 import com.coocoofroggy.otalive.Main;
 import com.coocoofroggy.otalive.objects.GlobalObject;
 import com.coocoofroggy.otalive.objects.QueuedDevUpload;
+import net.dv8tion.jda.api.EmbedBuilder;
 import net.dv8tion.jda.api.entities.Guild;
+import net.dv8tion.jda.api.entities.MessageEmbed;
 import net.dv8tion.jda.api.entities.TextChannel;
 import org.apache.commons.compress.archivers.zip.ZipArchiveEntry;
 import org.apache.commons.compress.archivers.zip.ZipFile;
@@ -53,6 +55,16 @@ public class TimerUtils {
             LinkedHashMap<String, Integer> initialTitleToDeviceCount = TssUtils.fetchTitleToDeviceCount();
             // Fetch the global object for Discord channels
             GlobalObject globalObject = MongoUtils.fetchGlobalObject();
+            Guild guild = Main.jda.getGuildById(globalObject.getGuildId());
+            if (guild == null) {
+                LOGGER.error("Guild not found—unable to send GDMF/TSS messages.");
+                return;
+            }
+            TextChannel channel = guild.getTextChannelById(globalObject.getChannelId());
+            if (channel == null) {
+                LOGGER.error("Channel not found—unable to send GDMF/TSS messages.");
+                return;
+            }
             // Run GDMF scanner
             boolean newAsset = GdmfUtils.runGdmfScanner(globalObject);
             // Process new assets: prepare the list of queued uploads.
@@ -64,6 +76,7 @@ public class TimerUtils {
                 sendChangedEmbed = true;
                 // Keep running the GDMF scanner until everything settles
                 do {
+                    channel.sendMessage("Running GDMF scanner again until everything settles.").queue();
                     LOGGER.info("Running GDMF scanner again until everything settles.");
                     // Run GDMF scanner
                     newAsset = GdmfUtils.runGdmfScanner(globalObject);
@@ -79,6 +92,7 @@ public class TimerUtils {
                 sendChangedEmbed = true;
                 // Keep running the TSS scanner until everything settles
                 do {
+                    channel.sendMessage("Running TSS scanner again until everything settles.").queue();
                     LOGGER.info("Running TSS scanner again until everything settles.");
                     // Run TSS scanner
                     tssChanged = TssUtils.runTssScanner(globalObject);
@@ -90,6 +104,7 @@ public class TimerUtils {
                 // Run the GDMF scanner one more time.
                 // It's really fast, and during TSS checking, new assets could have appeared
                 do {
+                    channel.sendMessage("Running GDMF scanner again until everything settles.").queue();
                     LOGGER.info("Running GDMF scanner post-TSS until everything settles.");
                     // Run GDMF scanner
                     newAsset = GdmfUtils.runGdmfScanner(globalObject);
@@ -99,9 +114,19 @@ public class TimerUtils {
                 } while (newAsset);
 
                 // Once everything is settled, send the embed with the changes
-                Guild guild = Main.jda.getGuildById(globalObject.getGuildId());
-                TextChannel channel = guild.getTextChannelById(globalObject.getChannelId());
-                channel.sendMessageEmbeds(TssUtils.signedFirmwareEmbed(initialTitleToDeviceCount).build()).queue();
+                // All embeds (could be > 10)
+                List<EmbedBuilder> firmwareEmbeds = TssUtils.firmwareEmbeds(initialTitleToDeviceCount);
+                // Queued embeds to send in groups of 10
+                List<MessageEmbed> queuedEmbeds = new ArrayList<>();
+                for (int i = 0; i < firmwareEmbeds.size(); i++) {
+                    if (i % 10 == 0 && i != 0) {
+                        channel.sendMessageEmbeds(queuedEmbeds).queue();
+                        queuedEmbeds = new ArrayList<>();
+                    }
+                    queuedEmbeds.add(firmwareEmbeds.get(i).build());
+                }
+                if (!queuedEmbeds.isEmpty())
+                    channel.sendMessageEmbeds(queuedEmbeds).queue();
             }
 
             // Upload every new dev file queued, asynchronously
