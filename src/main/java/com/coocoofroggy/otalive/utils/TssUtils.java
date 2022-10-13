@@ -68,7 +68,8 @@ public class TssUtils {
 
         // If the device is A16 or higher, add the special UID_MODE flag for TSS
         int chipInt = Integer.parseInt(buildIdentity.getApChipID().replaceFirst("0x", ""));
-        if (chipInt >= 8120) {
+        // Thanks Nyu for the method of catching A16+ but not old Samsung chips
+        if (chipInt >= 8120 && chipInt < 8900) {
             rootDict.put("UID_MODE", false);
         }
 

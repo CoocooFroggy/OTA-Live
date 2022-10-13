@@ -46,7 +46,6 @@ public class TimerUtils {
      *     </ul>
      *     <li>Runs TSS scanner, finding out what BuildIdentities have been marked as unsigned</li>
      * </ul>
-     *
      */
     public static void scanLoop() {
         try {
