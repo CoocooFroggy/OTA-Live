@@ -85,9 +85,9 @@ public class TssUtils {
         response.close();
         client.close();
 
-        if (responseString.contains("STATUS=94&MESSAGE=This device isn't eligible for the requested build."))
+        if (responseString.startsWith("STATUS=94&MESSAGE=This device isn't eligible for the requested build."))
             return SigningStatus.UNSIGNED;
-        else if (responseString.contains("STATUS=0&MESSAGE=SUCCESS"))
+        else if (responseString.startsWith("STATUS=0&MESSAGE=SUCCESS"))
             return SigningStatus.SIGNED;
         else
             return SigningStatus.UNKNOWN;
