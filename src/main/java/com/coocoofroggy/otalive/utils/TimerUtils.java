@@ -104,7 +104,7 @@ public class TimerUtils {
                 // Run the GDMF scanner one more time.
                 // It's really fast, and during TSS checking, new assets could have appeared
                 do {
-                    channel.sendMessage("Running GDMF scanner again until everything settles.").queue();
+                    channel.sendMessage("Running GDMF scanner post-TSS until everything settles.").queue();
                     LOGGER.info("Running GDMF scanner post-TSS until everything settles.");
                     // Run GDMF scanner
                     newAsset = GdmfUtils.runGdmfScanner(globalObject);

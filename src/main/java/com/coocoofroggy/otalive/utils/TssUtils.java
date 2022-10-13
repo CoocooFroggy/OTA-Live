@@ -38,35 +38,20 @@ import java.util.concurrent.TimeUnit;
 
 public class TssUtils {
     private static final Logger LOGGER = LoggerFactory.getLogger(TssUtils.class);
-    private static final String TSS_REQUEST_TEMPLATE = """
-            <?xml version="1.0" encoding="UTF-8"?>
-            <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-            <plist version="1.0">
-                <dict>
-                    <key>ApECID</key>
-                    <integer>1</integer>
-                    <key>UniqueBuildID</key>
-                    <data>{{UBID}}</data>
-                    <key>ApChipID</key>
-                    <string>{{CPID}}</string>
-                    <key>ApBoardID</key>
-                    <string>{{BDID}}</string>
-                    <key>ApSecurityDomain</key>
-                    <string>{{SDOM}}</string>
-                    <key>ApNonce</key>
-                    <data>q83vASNFZ4mrze8BI0VniavN7wE=</data>
-                    <key>@ApImg4Ticket</key>
-                    <true/>
-                    <key>ApSecurityMode</key>
-                    <true/>
-                    <key>ApProductionMode</key>
-                    <true/>
-                    <key>SepNonce</key>
-                    <data>z59YgWI9Pv3oNas53hhBJXc4S0E=</data>
-                </dict>
-            </plist>
-            """;
     private static final DecimalFormat DECIMAL_FORMAT = new DecimalFormat("0.0");
+
+    private static final NSDictionary templateDict = new NSDictionary() {{
+        try {
+            put("ApECID", 1);
+            put("ApNonce", new NSData("q83vASNFZ4mrze8BI0VniavN7wE="));
+            put("@ApImg4Ticket", true);
+            put("ApSecurityMode", true);
+            put("ApProductionMode", true);
+            put("SepNonce", new NSData("z59YgWI9Pv3oNas53hhBJXc4S0E="));
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
+    }};
 
     private static ScheduledExecutorService presenceScheduler;
     private static double tssProgressCurrent = 0.0;
@@ -74,10 +59,20 @@ public class TssUtils {
     static boolean somethingGotUnsigned = false;
 
     public static SigningStatus tssCheckSigned(BuildIdentity buildIdentity) throws IOException {
-        String requestString = TSS_REQUEST_TEMPLATE.replaceFirst("\\{\\{UBID}}", buildIdentity.getBuildIdentityB64())
-                .replaceFirst("\\{\\{CPID}}", buildIdentity.getApChipID())
-                .replaceFirst("\\{\\{BDID}}", buildIdentity.getApBoardID())
-                .replaceFirst("\\{\\{SDOM}}", buildIdentity.getApSecurityDomain());
+        NSDictionary rootDict = templateDict.clone();
+
+        rootDict.put("UniqueBuildID", new NSData(buildIdentity.getBuildIdentityB64()));
+        rootDict.put("ApChipID", new NSString(buildIdentity.getApChipID()));
+        rootDict.put("ApBoardID", new NSString(buildIdentity.getApBoardID()));
+        rootDict.put("ApSecurityDomain", new NSString(buildIdentity.getApSecurityDomain()));
+
+        // If the device is A16 or higher, add the special UID_MODE flag for TSS
+        int chipInt = Integer.parseInt(buildIdentity.getApChipID().replaceFirst("0x", ""));
+        if (chipInt >= 8120) {
+            rootDict.put("UID_MODE", false);
+        }
+
+        String requestString = rootDict.toXMLPropertyList();
 
         CloseableHttpClient client = HttpClients.createDefault();
         HttpPost httpPost = new HttpPost("http://gs.apple.com/TSS/controller?action=2");
