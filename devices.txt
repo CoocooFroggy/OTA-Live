@@ -59,6 +59,8 @@ iPad11,6;J171aAP;iPad 8
 iPad11,7;J172aAP;iPad 8
 iPad12,1;J181AP;iPad 9
 iPad12,2;J182AP;iPad 9
+iPad13,18;J271AP;iPad 10
+iPad13,19;J272AP;iPad 10
 
 iPad4,1;J71AP;iPad Air 1
 iPad4,2;J72AP;iPad Air 1
@@ -113,3 +115,7 @@ iPad13,8;J522AP;iPad Pro 5 (12.9")
 iPad13,9;J522xAP;iPad Pro 5 (12.9")
 iPad13,10;J523AP;iPad Pro 5 (12.9")
 iPad13,11;J523xAP;iPad Pro 5 (12.9")
+iPad14,3;J617AP;iPad Pro 6 (11.0")
+iPad14,4;J618AP;iPad Pro 6 (11.0")
+iPad14,5;J620AP;iPad Pro 6 (12.9")
+iPad14,6;J621AP;iPad Pro 6 (12.9")
