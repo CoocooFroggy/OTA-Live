@@ -292,6 +292,9 @@ public class TssUtils {
             if (!iterator.hasNext()) {
                 embedBuilder.setDescription(stringBuilder);
                 embedsToSend.add(embedBuilder);
+                // Reset for UNSIGNED embed
+                stringBuilder = new StringBuilder();
+                embedBuilder = new EmbedBuilder();
             }
         }
 
