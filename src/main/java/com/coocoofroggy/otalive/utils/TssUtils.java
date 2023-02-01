@@ -90,8 +90,10 @@ public class TssUtils {
             return SigningStatus.UNSIGNED;
         else if (responseString.startsWith("STATUS=0&MESSAGE=SUCCESS"))
             return SigningStatus.SIGNED;
-        else
+        else {
+            System.err.println("Unknown singing status! Response: " + responseString);
             return SigningStatus.UNKNOWN;
+        }
     }
 
     public static BuildIdentity buildIdentityFromUrl(String urlString, String boardId) throws Exception {
