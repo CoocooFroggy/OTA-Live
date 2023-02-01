@@ -27,6 +27,7 @@ public class AzureUtils {
     }
 
     public static Response<BlockBlobItem> uploadInputStream(InputStream inputStream, long length, String path) {
+        if (containerClient == null) return null;
         if (!containerClient.getBlobClient(path).exists()) {
             return containerClient.getBlobClient(path).uploadWithResponse(
                     new BlobParallelUploadOptions(inputStream)

@@ -36,7 +36,9 @@ public class Main {
             throw new RuntimeException(e);
         }
         MongoUtils.connectToDb();
-        AzureUtils.connectToAzure();
+        if (System.getenv("AZURE_CONNECTION_STRING") != null) {
+            AzureUtils.connectToAzure();
+        }
         startBot();
         new Thread(Main::upsertAllCommands).start();
         TimerUtils.startLoopScheduler();
